@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Save, User as UserIcon, Building, Palette, Shield, Bell, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon } from 'lucide-react';
 import { SystemSettings, User, UserRole, WorkflowStage } from '../types';
@@ -58,6 +57,13 @@ export const Settings: React.FC<SettingsProps> = ({
     if (confirm('Are you sure you want to remove this user?')) {
       onUpdateUsers(users.filter(u => u.id !== id));
     }
+  };
+  
+  const handleRoleChange = (userId: string, newRole: UserRole) => {
+    const updatedUsers = users.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+    );
+    onUpdateUsers(updatedUsers);
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -252,14 +258,28 @@ export const Settings: React.FC<SettingsProps> = ({
                           <div className="flex items-center gap-3">
                               <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
                               <div>
-                                  <p className="font-bold text-gray-900 dark:text-white text-sm">{user.name}</p>
+                                  <p className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
+                                    {user.name}
+                                    {user.id === currentUser.id && (
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-${localSettings.themeColor}-100 dark:bg-${localSettings.themeColor}-900/50 text-${localSettings.themeColor}-700 dark:text-${localSettings.themeColor}-300`}>
+                                            You
+                                        </span>
+                                    )}
+                                  </p>
                                   <p className="text-xs text-gray-500 dark:text-slate-400">{user.email}</p>
                               </div>
                           </div>
                           <div className="flex items-center gap-4">
-                              <span className={`text-xs font-bold px-2 py-1 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300`}>
-                                  {user.role}
-                              </span>
+                              <select 
+                                  value={user.role}
+                                  onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
+                                  disabled={user.id === currentUser.id}
+                                  className="text-xs font-bold p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-transparent focus:ring-2 focus:ring-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed"
+                              >
+                                  {Object.values(UserRole).map(role => (
+                                      <option key={role} value={role}>{role}</option>
+                                  ))}
+                              </select>
                               {user.id !== currentUser.id && (
                                   <button 
                                       onClick={() => handleRemoveUser(user.id)}
