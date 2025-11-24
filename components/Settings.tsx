@@ -44,7 +44,7 @@ export const Settings: React.FC<SettingsProps> = ({
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
-        avatar: `https://ui-avatars.com/api/?name=${newUser.name.replace(' ', '+')}&background=random`,
+        avatar_url: `https://ui-avatars.com/api/?name=${newUser.name.replace(' ', '+')}&background=random`,
         status: 'offline',
         lastSeen: Date.now()
       };
@@ -69,7 +69,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const mockUrl = URL.createObjectURL(e.target.files[0]);
-      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, avatar: mockUrl } : u);
+      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, avatar_url: mockUrl } : u);
       onUpdateUsers(updatedUsers);
     }
   };
@@ -180,7 +180,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 <div className="pt-4">
                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">Admin Profile</label>
                    <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg border border-gray-200 dark:border-slate-700">
-                      <img src={currentUser.avatar} alt="Profile" className="w-16 h-16 rounded-full object-cover" />
+                      <img src={currentUser.avatar_url} alt="Profile" className="w-16 h-16 rounded-full object-cover" />
                       <div>
                           <p className="font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
                           <p className="text-sm text-gray-500 dark:text-slate-400">{currentUser.email}</p>
@@ -256,7 +256,7 @@ export const Settings: React.FC<SettingsProps> = ({
                   {users.map(user => (
                       <div key={user.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl hover:shadow-sm transition-shadow">
                           <div className="flex items-center gap-3">
-                              <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
+                              <img src={user.avatar_url} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
                               <div>
                                   <p className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
                                     {user.name}

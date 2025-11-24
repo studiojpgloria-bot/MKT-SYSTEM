@@ -160,7 +160,7 @@ export const Layout: React.FC<LayoutProps> = ({
             className={`flex items-center gap-3 cursor-pointer p-2 -m-2 rounded-lg hover:bg-slate-800 transition-colors ${!isSidebarOpen && 'justify-center'}`}
           >
             <img
-              src={currentUser.avatar}
+              src={currentUser.avatar_url}
               alt="Profile"
               className={`w-10 h-10 rounded-full border-2 ${getBorderClass()}`}
             />

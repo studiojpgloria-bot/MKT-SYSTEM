@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, CheckCircle, AlertCircle, Clock, Timer, User as UserIcon, Coffee, Wifi, Activity, ChevronRight, PlayCircle } from 'lucide-react';
@@ -153,7 +152,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <div key={user.id} className="flex items-center justify-between group">
                         <div className="flex items-center gap-3">
                             <div className="relative">
-                                <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
+                                <img src={user.avatar_url} alt={user.name} className="w-10 h-10 rounded-full object-cover border border-gray-100 dark:border-slate-700" />
                                 <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${
                                     user.status === 'online' ? 'bg-emerald-500' : 
                                     user.status === 'paused' ? 'bg-amber-500' : 'bg-gray-400'

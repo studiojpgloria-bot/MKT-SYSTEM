@@ -51,7 +51,7 @@ export interface User {
   id: string;
   name: string;
   role: UserRole;
-  avatar: string;
+  avatar_url: string;
   email: string;
   status: 'online' | 'paused' | 'offline';
   lastSeen: number;
