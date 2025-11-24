@@ -1,4 +1,3 @@
-
 export enum UserRole {
   ADMIN = 'ADMIN',
   MANAGER = 'MANAGER',
@@ -100,6 +99,7 @@ export interface Task {
   priority: TaskPriority;
   assigneeId: string;
   dueDate: number;
+  createdAt: number;
   client: string;
   tags: string[];
   subtasks: Subtask[];

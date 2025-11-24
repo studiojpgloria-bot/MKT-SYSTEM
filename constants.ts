@@ -1,4 +1,3 @@
-
 import { Task, TaskPriority, TaskStage, User, UserRole, CalendarEvent, SystemSettings } from './types';
 
 export const MOCK_USERS: User[] = [
@@ -40,6 +39,7 @@ export const INITIAL_TASKS: Task[] = [
     priority: TaskPriority.HIGH,
     assigneeId: 'u2',
     dueDate: Date.now() + 86400000 * 2,
+    createdAt: Date.now() - 86400000 * 20,
     client: 'TechCorp',
     tags: ['Strategy', 'Social'],
     subtasks: [
@@ -60,6 +60,7 @@ export const INITIAL_TASKS: Task[] = [
     priority: TaskPriority.URGENT,
     assigneeId: 'u3',
     dueDate: Date.now() + 86400000 * 5,
+    createdAt: Date.now() - 86400000 * 15,
     client: 'FashionNova',
     tags: ['Video', 'Instagram'],
     subtasks: [
@@ -91,6 +92,7 @@ export const INITIAL_TASKS: Task[] = [
     priority: TaskPriority.MEDIUM,
     assigneeId: 'u3',
     dueDate: Date.now() - 86400000,
+    createdAt: Date.now() - 86400000 * 10,
     client: 'EcoStore',
     tags: ['Web', 'Design'],
     subtasks: [],
@@ -118,6 +120,7 @@ export const INITIAL_TASKS: Task[] = [
     priority: TaskPriority.LOW,
     assigneeId: 'u2',
     dueDate: Date.now() + 86400000 * 10,
+    createdAt: Date.now() - 86400000 * 5,
     client: 'TechCorp',
     tags: ['Email', 'Copy'],
     subtasks: [

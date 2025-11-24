@@ -9,6 +9,7 @@ import { TaskDetailModal } from './components/TaskDetailModal';
 import { NotificationToast } from './components/NotificationToast';
 import { Settings } from './components/Settings';
 import { Reports } from './components/Reports'; 
+import { ProfilePage } from './components/ProfilePage';
 import { MOCK_USERS, INITIAL_TASKS, INITIAL_EVENTS, INITIAL_SETTINGS } from './constants';
 import { Task, User, UserRole, TaskPriority, Attachment, Notification, SystemSettings, WorkflowStage, CalendarEvent } from './types';
 
@@ -154,6 +155,11 @@ export const App: React.FC = () => {
       } else if (status === 'online') {
           addNotification('Status Updated', 'You are back online.', 'success');
       }
+  };
+
+  const handleUpdateUser = (userId: string, updates: Partial<User>) => {
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
+    addNotification('Profile Updated', 'Your changes have been saved.', 'success');
   };
 
   const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
@@ -332,6 +338,7 @@ export const App: React.FC = () => {
           priority: TaskPriority.MEDIUM,
           assigneeId: currentUser.id,
           dueDate: Date.now() + 86400000,
+          createdAt: Date.now(),
           client: 'New Client',
           tags: [],
           subtasks: [],
@@ -355,6 +362,7 @@ export const App: React.FC = () => {
           priority: TaskPriority.MEDIUM,
           assigneeId: currentUser.id,
           dueDate: Date.now() + 86400000,
+          createdAt: Date.now(),
           client: 'New Client',
           tags: [],
           subtasks: [],
@@ -462,6 +470,12 @@ export const App: React.FC = () => {
             onUpdateUsers={setUsers}
             onUpdateWorkflow={setWorkflow}
             onResetApp={handleResetApp}
+        />
+      ) : currentView === 'profile' ? (
+        <ProfilePage 
+            currentUser={currentUser}
+            onUpdateUser={handleUpdateUser}
+            themeColor={settings.themeColor}
         />
       ) : (
         <Dashboard 
