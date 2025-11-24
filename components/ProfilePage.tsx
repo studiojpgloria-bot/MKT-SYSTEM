@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useRef } from 'react';
 import { User } from '../types';
 import { Save, Camera, Shield } from 'lucide-react';

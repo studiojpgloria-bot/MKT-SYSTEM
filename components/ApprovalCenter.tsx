@@ -1,3 +1,4 @@
+"use client";
 
 import React, { useState, useEffect } from 'react';
 import { FileText, Check, X, Eye, Download, MessageSquare, Play, Film, Plus, Trash2, Clock } from 'lucide-react';
@@ -330,7 +331,6 @@ export const ApprovalCenter: React.FC<ApprovalCenterProps> = ({ tasks, onApprove
                             </p>
                         )}
                     </div>
-
                 </div>
             </div>
         </div>
