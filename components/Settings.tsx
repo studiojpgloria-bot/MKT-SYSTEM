@@ -1,4 +1,3 @@
-"use client";
 
 import React, { useState, useRef } from 'react';
 import { Save, User as UserIcon, Building, Palette, Shield, Bell, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon } from 'lucide-react';
@@ -46,7 +45,7 @@ export const Settings: React.FC<SettingsProps> = ({
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,
-        avatar_url: `https://ui-avatars.com/api/?name=${newUser.name.replace(' ', '+')}&background=random`,
+        avatar: `https://ui-avatars.com/api/?name=${newUser.name.replace(' ', '+')}&background=random`,
         status: 'offline',
         lastSeen: Date.now()
       };
@@ -60,18 +59,11 @@ export const Settings: React.FC<SettingsProps> = ({
       onUpdateUsers(users.filter(u => u.id !== id));
     }
   };
-  
-  const handleRoleChange = (userId: string, newRole: UserRole) => {
-    const updatedUsers = users.map(u => 
-        u.id === userId ? { ...u, role: newRole } : u
-    );
-    onUpdateUsers(updatedUsers);
-  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const mockUrl = URL.createObjectURL(e.target.files[0]);
-      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, avatar_url: mockUrl } : u);
+      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, avatar: mockUrl } : u);
       onUpdateUsers(updatedUsers);
     }
   };
@@ -182,7 +174,7 @@ export const Settings: React.FC<SettingsProps> = ({
                 <div className="pt-4">
                    <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-3">Admin Profile</label>
                    <div className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-slate-800/50 rounded-lg border border-gray-200 dark:border-slate-700">
-                      <img src={currentUser.avatar_url} alt="Profile" className="w-16 h-16 rounded-full object-cover" />
+                      <img src={currentUser.avatar} alt="Profile" className="w-16 h-16 rounded-full object-cover" />
                       <div>
                           <p className="font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
                           <p className="text-sm text-gray-500 dark:text-slate-400">{currentUser.email}</p>
@@ -258,30 +250,16 @@ export const Settings: React.FC<SettingsProps> = ({
                   {users.map(user => (
                       <div key={user.id} className="flex items-center justify-between p-4 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl hover:shadow-sm transition-shadow">
                           <div className="flex items-center gap-3">
-                              <img src={user.avatar_url} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
+                              <img src={user.avatar} alt={user.name} className="w-10 h-10 rounded-full object-cover" />
                               <div>
-                                  <p className="font-bold text-gray-900 dark:text-white text-sm flex items-center gap-2">
-                                    {user.name}
-                                    {user.id === currentUser.id && (
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-${localSettings.themeColor}-100 dark:bg-${localSettings.themeColor}-900/50 text-${localSettings.themeColor}-700 dark:text-${localSettings.themeColor}-300`}>
-                                            You
-                                        </span>
-                                    )}
-                                  </p>
+                                  <p className="font-bold text-gray-900 dark:text-white text-sm">{user.name}</p>
                                   <p className="text-xs text-gray-500 dark:text-slate-400">{user.email}</p>
                               </div>
                           </div>
                           <div className="flex items-center gap-4">
-                              <select 
-                                  value={user.role}
-                                  onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                                  disabled={user.id === currentUser.id}
-                                  className="text-xs font-bold p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-transparent focus:ring-2 focus:ring-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed"
-                              >
-                                  {Object.values(UserRole).map(role => (
-                                      <option key={role} value={role}>{role}</option>
-                                  ))}
-                              </select>
+                              <span className={`text-xs font-bold px-2 py-1 rounded-full bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300`}>
+                                  {user.role}
+                              </span>
                               {user.id !== currentUser.id && (
                                   <button 
                                       onClick={() => handleRemoveUser(user.id)}

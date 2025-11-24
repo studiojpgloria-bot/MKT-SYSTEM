@@ -1,7 +1,6 @@
-"use client";
 
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, Moon, Sun, User as UserIcon } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, Moon, Sun } from 'lucide-react';
 import { User, UserRole, SystemSettings, Notification } from '../types';
 
 interface LayoutProps {
@@ -33,21 +32,16 @@ export const Layout: React.FC<LayoutProps> = ({
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-  const profileMenuRef = useRef<HTMLDivElement>(null);
   const themeColor = settings.themeColor;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // Close dropdowns when clicking outside
+  // Close notification dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
         setIsNotifOpen(false);
-      }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
-        setIsProfileMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -156,13 +150,10 @@ export const Layout: React.FC<LayoutProps> = ({
             ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 relative" ref={profileMenuRef}>
-          <div 
-            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-            className={`flex items-center gap-3 cursor-pointer p-2 -m-2 rounded-lg hover:bg-slate-800 transition-colors ${!isSidebarOpen && 'justify-center'}`}
-          >
+        <div className="p-4 border-t border-slate-800">
+          <div className={`flex items-center gap-3 ${!isSidebarOpen && 'justify-center'}`}>
             <img
-              src={currentUser.avatar_url}
+              src={currentUser.avatar}
               alt="Profile"
               className={`w-10 h-10 rounded-full border-2 ${getBorderClass()}`}
             />
@@ -173,24 +164,14 @@ export const Layout: React.FC<LayoutProps> = ({
               </div>
             )}
           </div>
-
-          {isProfileMenuOpen && (
-            <div className="absolute bottom-full left-4 right-4 mb-2 w-auto bg-slate-950 rounded-lg shadow-2xl border border-slate-800 z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              <button
-                onClick={() => { onNavigate('profile'); setIsProfileMenuOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-              >
-                <UserIcon size={16} />
-                Meu Perfil
-              </button>
-              <button
-                onClick={onLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors border-t border-slate-800"
-              >
-                <LogOut size={16} />
-                Sair
-              </button>
-            </div>
+          {isSidebarOpen && (
+             <button
+             onClick={onLogout}
+             className="mt-4 w-full flex items-center justify-center gap-2 text-xs text-slate-400 hover:text-white border border-slate-700 rounded py-1.5 hover:bg-slate-800 transition-colors"
+           >
+             <LogOut size={14} />
+             Sign Out
+           </button>
           )}
         </div>
       </aside>

@@ -1,4 +1,3 @@
-"use client";
 
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreHorizontal, Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, Trash2, Check, Download, CheckSquare } from 'lucide-react';
@@ -332,7 +331,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                           <div className="flex items-center gap-3">
                               {assignee && (
                                   <img 
-                                      src={assignee.avatar_url} 
+                                      src={assignee.avatar} 
                                       alt={assignee.name} 
                                       title={assignee.name}
                                       className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-slate-800" 

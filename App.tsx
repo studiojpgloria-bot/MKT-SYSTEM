@@ -1,4 +1,3 @@
-"use client";
 import React, { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { Login } from './components/Login';
@@ -10,11 +9,8 @@ import { TaskDetailModal } from './components/TaskDetailModal';
 import { NotificationToast } from './components/NotificationToast';
 import { Settings } from './components/Settings';
 import { Reports } from './components/Reports'; 
-import { ProfilePage } from './components/ProfilePage';
-import { INITIAL_TASKS, INITIAL_EVENTS, INITIAL_SETTINGS } from './constants';
+import { MOCK_USERS, INITIAL_TASKS, INITIAL_EVENTS, INITIAL_SETTINGS } from './constants';
 import { Task, User, UserRole, TaskPriority, Attachment, Notification, SystemSettings, WorkflowStage, CalendarEvent } from './types';
-import { supabase } from '@/src/integrations/supabase/client';
-import { Session } from '@supabase/supabase-js';
 
 // Initial Workflow
 const INITIAL_WORKFLOW: WorkflowStage[] = [
@@ -26,10 +22,12 @@ const INITIAL_WORKFLOW: WorkflowStage[] = [
 ];
 
 export const App: React.FC = () => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUserIndex, setCurrentUserIndex] = useState(0);
   const [currentView, setCurrentView] = useState('dashboard');
   
+  // Load from LocalStorage or use Initial
   const [tasks, setTasks] = useState<Task[]>(() => {
       const saved = localStorage.getItem('nexus_tasks');
       return saved ? JSON.parse(saved) : INITIAL_TASKS;
@@ -38,7 +36,10 @@ export const App: React.FC = () => {
       const saved = localStorage.getItem('nexus_events');
       return saved ? JSON.parse(saved) : INITIAL_EVENTS;
   });
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>(() => {
+      const saved = localStorage.getItem('nexus_users');
+      return saved ? JSON.parse(saved) : MOCK_USERS;
+  });
   const [workflow, setWorkflow] = useState<WorkflowStage[]>(() => {
       const saved = localStorage.getItem('nexus_workflow');
       return saved ? JSON.parse(saved) : INITIAL_WORKFLOW;
@@ -53,62 +54,14 @@ export const App: React.FC = () => {
       return savedTheme ? JSON.parse(savedTheme) : INITIAL_SETTINGS;
   });
   
+  // Modal State
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+
+  // Transient Toasts (Not persisted)
   const [toasts, setToasts] = useState<Notification[]>([]);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (session) {
-      fetchUserProfile();
-      fetchAllUsers();
-    } else {
-      setCurrentUser(null);
-      setUsers([]);
-    }
-  }, [session]);
-
-  const fetchUserProfile = async () => {
-    if (session?.user) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching user profile:', error);
-      } else if (data) {
-        setCurrentUser({
-            ...data,
-            email: session.user.email || '',
-            status: 'online', // Default status
-            lastSeen: Date.now()
-        });
-      }
-    }
-  };
-
-  const fetchAllUsers = async () => {
-    const { data, error } = await supabase.from('profiles').select('*');
-    if (error) {
-        console.error('Error fetching all users:', error);
-    } else {
-        setUsers(data.map(u => ({...u, email: 'hidden', status: 'offline', lastSeen: Date.now()})));
-    }
-  };
-
+  // Apply Dark Mode Effect
   useEffect(() => {
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
@@ -118,18 +71,27 @@ export const App: React.FC = () => {
     localStorage.setItem('nexus_darkMode', JSON.stringify(settings.darkMode));
   }, [settings.darkMode]);
 
+  // Persistence Effects
   useEffect(() => { localStorage.setItem('nexus_tasks', JSON.stringify(tasks)); }, [tasks]);
   useEffect(() => { localStorage.setItem('nexus_events', JSON.stringify(events)); }, [events]);
+  useEffect(() => { localStorage.setItem('nexus_users', JSON.stringify(users)); }, [users]);
   useEffect(() => { localStorage.setItem('nexus_workflow', JSON.stringify(workflow)); }, [workflow]);
   useEffect(() => { localStorage.setItem('nexus_notifications', JSON.stringify(notifications)); }, [notifications]);
   useEffect(() => { localStorage.setItem('nexus_settings', JSON.stringify(settings)); }, [settings]);
 
+  // Derived State
+  const currentUser = users[currentUserIndex % users.length];
   const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
 
+  // Helper: Add Notification (Both Toast and History)
   const addNotification = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
       const id = Date.now().toString();
       const newNotif: Notification = { id, title, message, type, read: false, timestamp: Date.now() };
+      
+      // Add to history
       setNotifications(prev => [newNotif, ...prev]);
+      
+      // Add to toast queue
       setToasts(prev => [...prev, newNotif]);
       setTimeout(() => {
           setToasts(prev => prev.filter(n => n.id !== id));
@@ -148,49 +110,50 @@ export const App: React.FC = () => {
       setNotifications([]);
   };
 
+  // Reset Logic
   const handleResetApp = () => {
       localStorage.clear();
       setTasks(INITIAL_TASKS);
       setEvents(INITIAL_EVENTS);
+      setUsers(MOCK_USERS);
       setWorkflow(INITIAL_WORKFLOW);
       setNotifications([]);
       setSettings(INITIAL_SETTINGS);
       addNotification('System Reset', 'All data has been restored to defaults.', 'info');
   };
 
-  const handleLogout = async () => {
-      await supabase.auth.signOut();
+  // Auth Handlers
+  const handleLogin = (user: User) => {
+      const index = users.findIndex(u => u.id === user.id);
+      if (index !== -1) {
+          setCurrentUserIndex(index);
+          setIsAuthenticated(true);
+          addNotification('Welcome Back', `Signed in as ${user.name}`, 'success');
+          
+          // Set status to online on login
+          const updatedUsers = users.map(u => u.id === user.id ? { ...u, status: 'online' as const, lastSeen: Date.now() } : u);
+          setUsers(updatedUsers);
+      }
+  };
+
+  const handleLogout = () => {
+      // Set status to offline on logout
+      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, status: 'offline' as const, lastSeen: Date.now() } : u);
+      setUsers(updatedUsers);
+      
+      setIsAuthenticated(false);
       setCurrentView('dashboard');
   };
 
   const handleUpdateUserStatus = (status: 'online' | 'paused' | 'offline') => {
-      if (!currentUser) return;
       const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, status, lastSeen: Date.now() } : u);
       setUsers(updatedUsers);
-      setCurrentUser(prev => prev ? {...prev, status} : null);
       
       if (status === 'paused') {
           addNotification('Status Updated', 'You are now paused for 15 minutes.', 'warning');
       } else if (status === 'online') {
           addNotification('Status Updated', 'You are back online.', 'success');
       }
-  };
-
-  const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ name: updates.name, avatar_url: updates.avatar_url })
-      .eq('id', userId)
-      .select()
-      .single();
-
-    if (error) {
-      addNotification('Error', 'Could not update profile.', 'error');
-    } else {
-      setCurrentUser(prev => prev ? { ...prev, ...data } : null);
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...data } : u));
-      addNotification('Profile Updated', 'Your changes have been saved.', 'success');
-    }
   };
 
   const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
@@ -221,34 +184,42 @@ export const App: React.FC = () => {
   const handleExportTask = (taskId: string) => {
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
+
+      // Create CSV Content
       const headers = ['ID', 'Title', 'Client', 'Status', 'Priority', 'Due Date', 'Assignee'];
       const row = [
           task.id,
-          `"${task.title.replace(/"/g, '""')}"`,
+          `"${task.title.replace(/"/g, '""')}"`, // Escape quotes
           `"${task.client}"`,
           task.stage,
           task.priority,
           new Date(task.dueDate).toLocaleDateString(),
           users.find(u => u.id === task.assigneeId)?.name || 'Unassigned'
       ];
+
       const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), row.join(',')].join('\n');
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
       link.setAttribute("download", `task_${task.id}.csv`);
-      document.body.appendChild(link);
+      document.body.appendChild(link); // Required for FF
+      
       link.click();
       document.body.removeChild(link);
+
       addNotification('Export Complete', 'Task details downloaded as CSV.', 'success');
   };
 
   const handleUploadAttachment = (taskId: string, file: File) => {
-    if (!currentUser) return;
     const mockUrl = URL.createObjectURL(file);
     const type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'pdf';
+    
     const isManagerOrAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER;
+    
+    // Admin uploads are references (approved by default), Members are deliverables (pending)
     const category = isManagerOrAdmin ? 'reference' : 'deliverable';
     const status = isManagerOrAdmin ? 'approved' : 'pending';
+
     const newAttachment: Attachment = {
         id: `a${Date.now()}`,
         name: file.name,
@@ -259,26 +230,30 @@ export const App: React.FC = () => {
         uploadedBy: currentUser.id,
         status: status
     };
+
     processAttachmentLogic(taskId, newAttachment);
   };
 
   const handleCloudImport = (taskId: string, service: string) => {
-      if (!currentUser) return;
+      // Simulate async cloud fetch
       addNotification('Connecting to Cloud', `Fetching files from ${service.replace('_', ' ')}...`, 'info');
+      
       const isManagerOrAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER;
       const category = isManagerOrAdmin ? 'reference' : 'deliverable';
       const status = isManagerOrAdmin ? 'approved' : 'pending';
+
       setTimeout(() => {
           const newAttachment: Attachment = {
             id: `c${Date.now()}`,
             name: `Project_Brief_${service}.pdf`,
-            url: '#',
+            url: '#', // Mock URL
             type: 'pdf',
             source: service as any,
             category: category,
             uploadedBy: currentUser.id,
             status: status
           };
+          
           processAttachmentLogic(taskId, newAttachment);
       }, 1500);
   };
@@ -286,6 +261,8 @@ export const App: React.FC = () => {
   const processAttachmentLogic = (taskId: string, newAttachment: Attachment) => {
     setTasks(prev => prev.map(t => {
         if(t.id !== taskId) return t;
+        
+        // WORKFLOW RULE: If Member uploads a DELIVERABLE in Design stage, move to Review
         let newStage = t.stage;
         if (t.stage === 'design' && newAttachment.category === 'deliverable') {
             newStage = 'review';
@@ -295,12 +272,16 @@ export const App: React.FC = () => {
         } else {
             addNotification('Attachment Added', 'File added to task.', 'success');
         }
-        return { ...t, stage: newStage, attachments: [...t.attachments, newAttachment] };
+
+        return { 
+            ...t, 
+            stage: newStage,
+            attachments: [...t.attachments, newAttachment] 
+        };
     }));
   };
 
   const handleAddComment = (taskId: string, text: string) => {
-      if (!currentUser) return;
       const newComment = {
           id: Date.now().toString(),
           userId: currentUser.id,
@@ -330,7 +311,7 @@ export const App: React.FC = () => {
         if(t.id !== taskId) return t;
         return {
             ...t,
-            stage: 'design',
+            stage: 'design', // Move back to Design/Changes column
             attachments: t.attachments.map(a => a.id === attachmentId ? {...a, status: 'rejected', feedback: feedback || a.feedback} : a)
         };
     }));
@@ -343,7 +324,6 @@ export const App: React.FC = () => {
   };
 
   const handleNewTask = () => {
-      if (!currentUser) return;
       const newTask: Task = {
           id: `t${Date.now()}`,
           title: 'New Task',
@@ -352,7 +332,6 @@ export const App: React.FC = () => {
           priority: TaskPriority.MEDIUM,
           assigneeId: currentUser.id,
           dueDate: Date.now() + 86400000,
-          createdAt: Date.now(),
           client: 'New Client',
           tags: [],
           subtasks: [],
@@ -368,7 +347,6 @@ export const App: React.FC = () => {
   };
   
   const handleQuickCreateTask = (title: string, stageId: string) => {
-      if (!currentUser) return;
       const newTask: Task = {
           id: `t${Date.now()}`,
           title: title,
@@ -377,7 +355,6 @@ export const App: React.FC = () => {
           priority: TaskPriority.MEDIUM,
           assigneeId: currentUser.id,
           dueDate: Date.now() + 86400000,
-          createdAt: Date.now(),
           client: 'New Client',
           tags: [],
           subtasks: [],
@@ -400,20 +377,24 @@ export const App: React.FC = () => {
       addNotification('Event Deleted', 'Calendar event removed.', 'info');
   };
 
+  // Redirect to allowed view if role changes
   useEffect(() => {
-     if (!session || !currentUser) return;
+     if (!isAuthenticated) return; // Don't redirect if not logged in
+
      if ((currentView === 'approvals' || currentView === 'reports') && currentUser.role === UserRole.MEMBER) {
          setCurrentView('dashboard');
      }
      if (currentView === 'settings' && currentUser.role !== UserRole.ADMIN) {
          setCurrentView('dashboard');
      }
-  }, [currentUser, currentView, session]);
+  }, [currentUser.role, currentView, isAuthenticated]);
 
-  if (!session || !currentUser) {
-      return <Login settings={settings} />;
+  // Main Render Logic
+  if (!isAuthenticated) {
+      return <Login users={users} onLogin={handleLogin} settings={settings} />;
   }
   
+  // Merge Manual Events + Task Deadlines for Calendar
   const calendarEvents: CalendarEvent[] = [
       ...events,
       ...tasks.map(t => ({
@@ -482,13 +463,6 @@ export const App: React.FC = () => {
             onUpdateWorkflow={setWorkflow}
             onResetApp={handleResetApp}
         />
-      ) : currentView === 'profile' ? (
-        <ProfilePage 
-            currentUser={currentUser}
-            onUpdateUser={handleUpdateUser}
-            themeColor={settings.themeColor}
-            addNotification={addNotification}
-        />
       ) : (
         <Dashboard 
             tasks={tasks} 
@@ -502,6 +476,7 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* Transient Toasts */}
       <div className="fixed top-4 right-4 z-[60] space-y-3 pointer-events-none">
         {toasts.map(n => (
             <NotificationToast 

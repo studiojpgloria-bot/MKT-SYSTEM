@@ -1,4 +1,3 @@
-"use client";
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, Cloud, HardDrive, FileText, CheckSquare, GripVertical } from 'lucide-react';
@@ -464,7 +463,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                        const commentUser = users.find(u => u.id === comment.userId);
                        return (
                            <div key={comment.id} className="flex gap-3">
-                               <img src={commentUser?.avatar_url} alt={commentUser?.name} className="w-8 h-8 rounded-full mt-1" />
+                               <img src={commentUser?.avatar} alt={commentUser?.name} className="w-8 h-8 rounded-full mt-1" />
                                <div className="bg-gray-50 p-3 rounded-r-xl rounded-bl-xl flex-1">
                                    <div className="flex items-center justify-between mb-1">
                                        <span className="text-xs font-bold text-gray-700">{commentUser?.name}</span>
@@ -536,7 +535,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Assignee</label>
                     <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200 shadow-sm">
                         {assignee ? (
-                             <img src={assignee.avatar_url} alt={assignee.name} className="w-6 h-6 rounded-full" />
+                             <img src={assignee.avatar} alt={assignee.name} className="w-6 h-6 rounded-full" />
                         ) : (
                             <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center"><UserIcon size={14} className="text-gray-400"/></div>
                         )}
