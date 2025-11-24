@@ -12,7 +12,7 @@ import { Reports } from './components/Reports';
 import { ProfilePage } from './components/ProfilePage';
 import { INITIAL_TASKS, INITIAL_EVENTS, INITIAL_SETTINGS } from './constants';
 import { Task, User, UserRole, TaskPriority, Attachment, Notification, SystemSettings, WorkflowStage, CalendarEvent } from './types';
-import { supabase } from './integrations/supabase/client';
+import { supabase } from '@/src/integrations/supabase/client';
 import { Session } from '@supabase/supabase-js';
 
 // Initial Workflow

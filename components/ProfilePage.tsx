@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { User } from '../types';
 import { Save, Camera, Shield } from 'lucide-react';
-import { supabase } from '../integrations/supabase/client';
+import { supabase } from '@/src/integrations/supabase/client';
 
 interface ProfilePageProps {
   currentUser: User;
