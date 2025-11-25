@@ -35,21 +35,31 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       .eq('id', userId)
       .single();
 
+    const authUser = session?.user || supabaseUser;
+    if (!authUser) return null;
+
     if (error) {
       console.error('Error fetching profile:', error);
-      return null;
+      // Fallback: create a minimal user object if profile fetch fails
+      return {
+        id: userId,
+        name: authUser.email?.split('@')[0] || 'User',
+        role: UserRole.MEMBER,
+        avatar: 'https://ui-avatars.com/api/?name=' + (authUser.email?.split('@')[0] || 'User').replace(' ', '+') + '&background=random',
+        email: authUser.email || '',
+        status: 'online',
+        lastSeen: Date.now(),
+      };
     }
 
     if (profileData) {
-      // Combine profile data with auth user data (email is available via session.user)
-      const authUser = session?.user;
-      if (!authUser) return null;
-
+      const userName = profileData.name || authUser.email?.split('@')[0] || 'User';
+      
       const user: User = {
         id: profileData.id,
-        name: profileData.name || authUser.email?.split('@')[0] || 'User',
+        name: userName,
         role: profileData.role as UserRole || UserRole.MEMBER,
-        avatar: profileData.avatar_url || 'https://ui-avatars.com/api/?name=' + profileData.name?.replace(' ', '+') + '&background=random',
+        avatar: profileData.avatar_url || 'https://ui-avatars.com/api/?name=' + userName.replace(' ', '+') + '&background=random',
         email: authUser.email || '',
         status: 'online', // Default status on login
         lastSeen: Date.now(),
@@ -65,6 +75,7 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setSupabaseUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
+        // Ensure session is set before fetching profile
         const profile = await fetchProfile(currentSession.user.id);
         setCurrentUser(profile);
       } else {
@@ -87,7 +98,7 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [session]); // Added session dependency to ensure fetchProfile uses the latest session state
 
   const isAuthenticated = !!session && !!currentUser;
 
