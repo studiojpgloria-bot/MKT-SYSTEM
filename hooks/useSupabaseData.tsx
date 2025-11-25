@@ -25,35 +25,51 @@ export const useSupabaseData = (): SupabaseData => {
   const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
   const [dataLoading, setDataLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false); // New state for initial local load
 
   const refetchData = () => setRefreshKey(prev => prev + 1);
 
-  // 1. Load local settings/workflow (runs once)
+  // 1. Load local settings/workflow (runs once, synchronously)
   useEffect(() => {
     const savedSettings = localStorage.getItem('nexus_settings');
-    if (savedSettings) setSettings(JSON.parse(savedSettings));
+    if (savedSettings) {
+        try {
+            setSettings(JSON.parse(savedSettings));
+        } catch (e) {
+            console.error("Error parsing saved settings:", e);
+        }
+    }
     
     const savedWorkflow = localStorage.getItem('nexus_workflow');
-    if (savedWorkflow) setWorkflow(JSON.parse(savedWorkflow));
-    
-    // If not authenticated, we still finish the initial local loading
-    if (!isAuthenticated) {
-        setDataLoading(false);
+    if (savedWorkflow) {
+        try {
+            setWorkflow(JSON.parse(savedWorkflow));
+        } catch (e) {
+            console.error("Error parsing saved workflow:", e);
+        }
     }
-  }, [isAuthenticated]);
+    
+    setInitialLoadComplete(true);
+  }, []);
 
   // 2. Persist local settings/workflow (runs on change)
   useEffect(() => {
-    localStorage.setItem('nexus_settings', JSON.stringify(settings));
-  }, [settings]);
+    if (initialLoadComplete) {
+        localStorage.setItem('nexus_settings', JSON.stringify(settings));
+    }
+  }, [settings, initialLoadComplete]);
 
   useEffect(() => {
-    localStorage.setItem('nexus_workflow', JSON.stringify(workflow));
-  }, [workflow]);
+    if (initialLoadComplete) {
+        localStorage.setItem('nexus_workflow', JSON.stringify(workflow));
+    }
+  }, [workflow, initialLoadComplete]);
 
 
-  // 3. Fetch remote data (runs on auth change or refresh)
+  // 3. Fetch remote data (runs on auth change or refresh, only after local load)
   useEffect(() => {
+    if (!initialLoadComplete) return;
+
     if (!isAuthenticated || !currentUser) {
       // If not authenticated, ensure data is cleared and loading is false
       setTasks([]);
@@ -134,7 +150,7 @@ export const useSupabaseData = (): SupabaseData => {
     };
 
     fetchAllData();
-  }, [isAuthenticated, currentUser?.id, refreshKey]); // Depend only on isAuthenticated, currentUser.id, and refreshKey
+  }, [isAuthenticated, currentUser?.id, refreshKey, initialLoadComplete]); // Added initialLoadComplete dependency
 
   return {
     tasks,
@@ -143,7 +159,7 @@ export const useSupabaseData = (): SupabaseData => {
     notifications,
     workflow,
     settings,
-    dataLoading,
+    dataLoading: dataLoading || !initialLoadComplete, // Wait for local settings AND remote data
     refetchData,
   };
 };

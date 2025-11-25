@@ -589,7 +589,7 @@ export const App: React.FC = () => {
       <TaskDetailModal 
         currentUser={currentUser}
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
+        onClose={() => setIsTaskModalModal(false)}
         task={selectedTask}
         users={users}
         workflow={workflow}
