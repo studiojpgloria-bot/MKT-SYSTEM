@@ -38,6 +38,9 @@ export const App: React.FC = () => {
 
   // Transient Toasts (Not persisted)
   const [toasts, setToasts] = useState<Notification[]>([]);
+  
+  // State to prevent multiple welcome notifications
+  const [welcomeNotificationShown, setWelcomeNotificationShown] = useState(false);
 
   // Enforce Light Mode
   useEffect(() => {
@@ -99,12 +102,14 @@ export const App: React.FC = () => {
   };
 
   // Auth Handlers
-  // Login is handled entirely by SupabaseProvider now. We just trigger a notification.
   useEffect(() => {
-      if (isAuthenticated && currentUser) {
+      if (isAuthenticated && currentUser && !welcomeNotificationShown) {
           addNotification('Welcome Back', `Signed in as ${currentUser.name}`, 'success');
+          setWelcomeNotificationShown(true);
+      } else if (!isAuthenticated) {
+          setWelcomeNotificationShown(false); // Reset on logout
       }
-  }, [isAuthenticated, currentUser]);
+  }, [isAuthenticated, currentUser, welcomeNotificationShown]);
 
   const handleLogout = async () => {
       // Set status to offline (local state only for now)
@@ -589,7 +594,7 @@ export const App: React.FC = () => {
       <TaskDetailModal 
         currentUser={currentUser}
         isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalModal(false)}
+        onClose={() => setIsTaskModalOpen(false)}
         task={selectedTask}
         users={users}
         workflow={workflow}
