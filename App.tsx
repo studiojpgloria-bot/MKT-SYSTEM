@@ -39,16 +39,11 @@ export const App: React.FC = () => {
   // Transient Toasts (Not persisted)
   const [toasts, setToasts] = useState<Notification[]>([]);
 
-  // Apply Dark Mode Effect and prevent flash
+  // Enforce Light Mode
   useEffect(() => {
-    if (settings.darkMode) {
-      document.documentElement.classList.add('dark');
-      document.documentElement.classList.remove('light');
-    } else {
-      document.documentElement.classList.add('light');
-      document.documentElement.classList.remove('dark');
-    }
-  }, [settings.darkMode]);
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+  }, []);
 
   // Derived State
   const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
@@ -475,7 +470,7 @@ export const App: React.FC = () => {
   // Loading State Render
   if (isAuthLoading || dataLoading) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
             <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
         </div>
     );
@@ -508,10 +503,8 @@ export const App: React.FC = () => {
         onNewTask={handleNewTask}
         settings={settings}
         onToggleTheme={() => {
-            // Note: Theme toggle requires a full reload to apply Tailwind classes correctly across the app.
-            const newSettings = {...settings, darkMode: !settings.darkMode};
-            localStorage.setItem('nexus_settings', JSON.stringify(newSettings));
-            window.location.reload();
+            // Since we are enforcing light mode, this function does nothing or can be removed from props if possible.
+            addNotification('Theme Locked', 'Dark mode is currently disabled.', 'info');
         }}
         notifications={notifications}
         onMarkRead={markNotificationRead}

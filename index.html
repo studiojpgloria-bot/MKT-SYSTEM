@@ -15,20 +15,6 @@
         scrollbar-width: none;
       }
     </style>
-    <script>
-      // Immediate theme check to prevent flash of unstyled content (FOUC)
-      const settings = localStorage.getItem('nexus_settings');
-      if (settings) {
-        try {
-          const parsedSettings = JSON.parse(settings);
-          if (parsedSettings.darkMode) {
-            document.documentElement.classList.add('dark');
-          }
-        } catch (e) {
-          console.error("Error parsing settings from localStorage:", e);
-        }
-      }
-    </script>
   <script type="importmap">
 {
   "imports": {

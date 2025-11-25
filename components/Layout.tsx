@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, Moon, Sun, User as UserIcon } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, User as UserIcon } from 'lucide-react';
 import { User, UserRole, SystemSettings, Notification } from '../types';
 
 interface LayoutProps {
@@ -9,7 +9,7 @@ interface LayoutProps {
   onLogout: () => void;
   onNewTask: () => void;
   settings: SystemSettings;
-  onToggleTheme: () => void;
+  onToggleTheme: () => void; // Kept for compatibility but will be a no-op
   notifications: Notification[];
   onMarkRead: (id: string) => void;
   onClearNotifications: () => void;
@@ -107,7 +107,7 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-slate-950 text-gray-900 dark:text-white font-sans overflow-hidden transition-colors duration-200">
+    <div className="flex h-screen bg-gray-50 text-gray-900 font-sans overflow-hidden transition-colors duration-200">
       {/* Sidebar */}
       <aside
         className={`${
@@ -195,39 +195,31 @@ export const Layout: React.FC<LayoutProps> = ({
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-6 flex-shrink-0 transition-colors duration-200">
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white capitalize tracking-tight">
+        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0 transition-colors duration-200">
+            <h1 className="text-2xl font-bold text-gray-800 capitalize tracking-tight">
                 {currentView === 'crm' ? 'CRM Kanban' : currentView.charAt(0).toUpperCase() + currentView.slice(1)}
             </h1>
             <div className="flex items-center gap-4">
-                {/* Dark Mode Toggle */}
-                <button 
-                  onClick={onToggleTheme}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 text-gray-500 dark:text-slate-400 transition-colors"
-                >
-                   {settings.darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                </button>
-
                 {/* Notifications */}
                 <div className="relative" ref={notifRef}>
                     <div 
-                      className="relative cursor-pointer p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-full transition-colors"
+                      className="relative cursor-pointer p-2 hover:bg-gray-100 rounded-full transition-colors"
                       onClick={() => setIsNotifOpen(!isNotifOpen)}
                     >
-                        <Bell className={`text-gray-500 dark:text-slate-400 hover:text-${themeColor}-600`} size={20} />
+                        <Bell className={`text-gray-500 hover:text-${themeColor}-600`} size={20} />
                         {unreadCount > 0 && (
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white dark:border-slate-900"></span>
+                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
                         )}
                     </div>
 
                     {isNotifOpen && (
-                      <div className="absolute right-0 top-12 w-80 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-gray-200 dark:border-slate-800 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                         <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between bg-gray-50 dark:bg-slate-950">
-                            <h3 className="font-bold text-gray-800 dark:text-white text-sm">Notifications</h3>
+                      <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+                            <h3 className="font-bold text-gray-800 text-sm">Notifications</h3>
                             {notifications.length > 0 && (
                                 <button 
                                   onClick={onClearNotifications} 
-                                  className="text-xs text-gray-500 dark:text-slate-400 hover:text-red-600 flex items-center gap-1"
+                                  className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"
                                 >
                                   <Trash2 size={12} /> Clear All
                                 </button>
@@ -235,7 +227,7 @@ export const Layout: React.FC<LayoutProps> = ({
                          </div>
                          <div className="max-h-80 overflow-y-auto">
                             {notifications.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400 dark:text-slate-500 text-sm">
+                                <div className="p-8 text-center text-gray-400 text-sm">
                                     <Bell size={24} className="mx-auto mb-2 opacity-20" />
                                     No notifications yet
                                 </div>
@@ -244,15 +236,15 @@ export const Layout: React.FC<LayoutProps> = ({
                                   <div 
                                     key={n.id} 
                                     onClick={() => onMarkRead(n.id)}
-                                    className={`p-3 border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 cursor-pointer transition-colors ${!n.read ? 'bg-blue-50/50 dark:bg-slate-800/50' : ''}`}
+                                    className={`p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!n.read ? 'bg-blue-50/50' : ''}`}
                                   >
                                       <div className="flex justify-between items-start mb-1">
-                                          <span className={`text-xs font-bold ${n.type === 'error' ? 'text-red-600' : n.type === 'success' ? 'text-green-600' : 'text-gray-800 dark:text-white'}`}>
+                                          <span className={`text-xs font-bold ${n.type === 'error' ? 'text-red-600' : n.type === 'success' ? 'text-green-600' : 'text-gray-800'}`}>
                                             {n.title}
                                           </span>
                                           <span className="text-[10px] text-gray-400">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                       </div>
-                                      <p className="text-xs text-gray-600 dark:text-slate-400 line-clamp-2">{n.message}</p>
+                                      <p className="text-xs text-gray-600 line-clamp-2">{n.message}</p>
                                   </div>
                                 ))
                             )}
@@ -272,7 +264,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 )}
             </div>
         </header>
-        <div className="flex-1 overflow-auto bg-gray-100 dark:bg-slate-950 p-6 transition-colors duration-200">
+        <div className="flex-1 overflow-auto bg-gray-100 p-6 transition-colors duration-200">
             {children}
         </div>
       </main>
