@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { Task, CalendarEvent, Notification, User, WorkflowStage, SystemSettings } from '../types';
+import { Task, CalendarEvent, Notification, User, WorkflowStage, SystemSettings, UserRole } from '../types';
 import { useSupabaseAuth } from './useSupabaseAuth';
 import { INITIAL_WORKFLOW, INITIAL_SETTINGS } from '../constants';
 
@@ -28,15 +28,21 @@ export const useSupabaseData = (): SupabaseData => {
 
   const refetchData = () => setRefreshKey(prev => prev + 1);
 
+  // 1. Load local settings/workflow (runs once)
   useEffect(() => {
-    // Load settings and workflow from localStorage first (as they are system configs)
     const savedSettings = localStorage.getItem('nexus_settings');
     if (savedSettings) setSettings(JSON.parse(savedSettings));
     
     const savedWorkflow = localStorage.getItem('nexus_workflow');
     if (savedWorkflow) setWorkflow(JSON.parse(savedWorkflow));
-  }, []);
+    
+    // If not authenticated, we still finish the initial local loading
+    if (!isAuthenticated) {
+        setDataLoading(false);
+    }
+  }, [isAuthenticated]);
 
+  // 2. Persist local settings/workflow (runs on change)
   useEffect(() => {
     localStorage.setItem('nexus_settings', JSON.stringify(settings));
   }, [settings]);
@@ -46,8 +52,10 @@ export const useSupabaseData = (): SupabaseData => {
   }, [workflow]);
 
 
+  // 3. Fetch remote data (runs on auth change or refresh)
   useEffect(() => {
     if (!isAuthenticated || !currentUser) {
+      // If not authenticated, ensure data is cleared and loading is false
       setTasks([]);
       setEvents([]);
       setAllUsers([]);
@@ -64,16 +72,15 @@ export const useSupabaseData = (): SupabaseData => {
         .from('profiles')
         .select('id, name, role, avatar_url');
       
+      let fetchedUsers: User[] = [];
       if (usersData && !usersError) {
-        // Merge with current status logic (which is currently local state based)
-        // For now, we use a simplified User structure from profiles
-        const fetchedUsers: User[] = usersData.map(p => ({
+        fetchedUsers = usersData.map(p => ({
             id: p.id,
             name: p.name || 'Unknown User',
             role: p.role as UserRole,
             avatar: p.avatar_url || 'https://ui-avatars.com/api/?name=' + p.name?.replace(' ', '+') + '&background=random',
-            email: '', // Email is not in public profiles table for security
-            status: 'offline', // Status needs to be managed separately or fetched from a status table
+            email: '', 
+            status: 'offline', 
             lastSeen: Date.now(),
         }));
         
@@ -127,7 +134,7 @@ export const useSupabaseData = (): SupabaseData => {
     };
 
     fetchAllData();
-  }, [isAuthenticated, currentUser, refreshKey]);
+  }, [isAuthenticated, currentUser?.id, refreshKey]); // Depend only on isAuthenticated, currentUser.id, and refreshKey
 
   return {
     tasks,
