@@ -18,6 +18,16 @@ import { supabase } from './integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 
+// Helper function to convert a file to a base64 string
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
+
 export const App: React.FC = () => {
   const { currentUser, isAuthenticated, isLoading: isAuthLoading } = useSupabaseAuth();
   const { 
@@ -165,34 +175,27 @@ export const App: React.FC = () => {
 
     try {
       const compressedFile = await imageCompression(file, options);
-      
-      const fileExt = compressedFile.name.split('.').pop();
-      const fileName = `${userId}.${fileExt}`; // Consistent name for overwriting
-      const filePath = `${fileName}`;
+      const base64File = await fileToBase64(compressedFile);
 
       addNotification('Enviando...', 'Sua nova foto de perfil está sendo enviada.', 'info');
       
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, compressedFile, {
-          cacheControl: '3600',
-          upsert: true,
-        });
+      // Invoke the edge function
+      const { data, error } = await supabase.functions.invoke('upload-avatar', {
+        body: { file: base64File, fileType: compressedFile.type },
+      });
 
-      if (uploadError) {
-        throw new Error(uploadError.message);
+      if (error) {
+        throw new Error(error.message);
       }
 
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      
       if (!data.publicUrl) {
-          throw new Error('Não foi possível obter a URL do avatar.');
+        throw new Error('A URL do avatar não foi retornada pela função.');
       }
       
-      // Add cache-busting query param to ensure the browser fetches the new image
+      // Add cache-busting query param
       const finalUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
 
-      // Call the generic update function which handles DB update, notification, and refetch
+      // Update the user's profile with the new URL
       await handleUpdateUser(userId, { avatar: finalUrl });
 
     } catch (error: any) {
