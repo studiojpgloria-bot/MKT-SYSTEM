@@ -133,30 +133,29 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
-    // Update profile data in Supabase
+    const supabaseUpdates: any = { updated_at: new Date().toISOString() };
+    if (updates.name) supabaseUpdates.name = updates.name;
+    if (updates.avatar) supabaseUpdates.avatar_url = updates.avatar;
+    if (updates.role) supabaseUpdates.role = updates.role;
+
     const { error } = await supabase
         .from('profiles')
-        .update({ 
-            name: updates.name, 
-            avatar_url: updates.avatar,
-            role: updates.role,
-            updated_at: new Date().toISOString()
-        })
+        .update(supabaseUpdates)
         .eq('id', userId);
 
     if (error) {
         console.error('Error updating profile:', error);
-        addNotification('Profile Update Failed', 'Could not save changes.', 'error');
+        addNotification('Falha na Atualização', 'Não foi possível salvar as alterações no perfil.', 'error');
     } else {
-        addNotification('Profile Updated', 'Your changes have been saved.', 'success');
-        refetchData(); // Refresh data to update local state
+        addNotification('Perfil Atualizado', 'Suas alterações foram salvas com sucesso.', 'success');
+        refetchData();
     }
   };
 
   const handleUpdateAvatar = async (userId: string, file: File) => {
     if (!currentUser) return;
 
-    addNotification('Processing...', 'Resizing your image before upload.', 'info');
+    addNotification('Processando...', 'Redimensionando sua imagem...', 'info');
 
     const options = {
       maxSizeMB: 1,
@@ -168,10 +167,10 @@ export const App: React.FC = () => {
       const compressedFile = await imageCompression(file, options);
       
       const fileExt = compressedFile.name.split('.').pop();
-      const fileName = `${userId}-${Date.now()}.${fileExt}`;
+      const fileName = `${userId}.${fileExt}`; // Consistent name for overwriting
       const filePath = `${fileName}`;
 
-      addNotification('Uploading...', 'Your new avatar is being uploaded.', 'info');
+      addNotification('Enviando...', 'Sua nova foto de perfil está sendo enviada.', 'info');
       
       const { error: uploadError } = await supabase.storage
         .from('avatars')
@@ -181,23 +180,24 @@ export const App: React.FC = () => {
         });
 
       if (uploadError) {
-        console.error('Error uploading avatar:', uploadError);
-        addNotification('Upload Failed', 'Could not upload your new avatar.', 'error');
-        return;
+        throw new Error(uploadError.message);
       }
 
       const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
       
       if (!data.publicUrl) {
-          addNotification('Update Failed', 'Could not retrieve the avatar URL.', 'error');
-          return;
+          throw new Error('Não foi possível obter a URL do avatar.');
       }
+      
+      // Add cache-busting query param to ensure the browser fetches the new image
+      const finalUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
 
-      await handleUpdateUser(userId, { avatar: data.publicUrl });
+      // Call the generic update function which handles DB update, notification, and refetch
+      await handleUpdateUser(userId, { avatar: finalUrl });
 
-    } catch (error) {
-      console.error('Error compressing image:', error);
-      addNotification('Processing Failed', 'Could not resize the image. Please try a different one.', 'error');
+    } catch (error: any) {
+      console.error('Falha ao atualizar avatar:', error);
+      addNotification('Falha no Upload', error.message || 'Não foi possível salvar sua nova foto.', 'error');
     }
   };
 
