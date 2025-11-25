@@ -39,11 +39,13 @@ export const App: React.FC = () => {
   // Transient Toasts (Not persisted)
   const [toasts, setToasts] = useState<Notification[]>([]);
 
-  // Apply Dark Mode Effect
+  // Apply Dark Mode Effect and prevent flash
   useEffect(() => {
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
     } else {
+      document.documentElement.classList.add('light');
       document.documentElement.classList.remove('dark');
     }
   }, [settings.darkMode]);
