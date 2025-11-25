@@ -9,7 +9,7 @@ interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  fetchProfile: (userId: string) => Promise<User | null>;
+  fetchProfile: (authUser: SupabaseUser) => Promise<User | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -28,24 +28,21 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProfile = async (userId: string): Promise<User | null> => {
+  const fetchProfile = async (authUser: SupabaseUser): Promise<User | null> => {
     const { data: profileData, error } = await supabase
       .from('profiles')
-      .select('id, name, role, avatar_url, updated_at')
-      .eq('id', userId)
+      .select('id, name, role, avatar_url')
+      .eq('id', authUser.id)
       .single();
 
-    const authUser = session?.user || supabaseUser;
-    if (!authUser) return null;
-
     if (error) {
-      console.error('Error fetching profile:', error);
-      // Fallback: create a minimal user object if profile fetch fails
+      console.error('Error fetching profile:', error.message);
+      // Fallback to a basic user object. This is a safeguard.
       return {
-        id: userId,
+        id: authUser.id,
         name: authUser.email?.split('@')[0] || 'User',
         role: UserRole.MEMBER,
-        avatar: 'https://ui-avatars.com/api/?name=' + (authUser.email?.split('@')[0] || 'User').replace(' ', '+') + '&background=random',
+        avatar: `https://ui-avatars.com/api/?name=${authUser.email?.split('@')[0] || 'User'}`,
         email: authUser.email || '',
         status: 'online',
         lastSeen: Date.now(),
@@ -54,14 +51,13 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     if (profileData) {
       const userName = profileData.name || authUser.email?.split('@')[0] || 'User';
-      
       const user: User = {
         id: profileData.id,
         name: userName,
         role: profileData.role as UserRole || UserRole.MEMBER,
-        avatar: profileData.avatar_url || 'https://ui-avatars.com/api/?name=' + userName.replace(' ', '+') + '&background=random',
+        avatar: profileData.avatar_url || `https://ui-avatars.com/api/?name=${userName.replace(' ', '+')}&background=random`,
         email: authUser.email || '',
-        status: 'online', // Default status on login
+        status: 'online',
         lastSeen: Date.now(),
       };
       return user;
@@ -70,13 +66,14 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   useEffect(() => {
+    // onAuthStateChange handles the initial session check and any subsequent changes.
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       setSession(currentSession);
-      setSupabaseUser(currentSession?.user ?? null);
+      const user = currentSession?.user ?? null;
+      setSupabaseUser(user);
       
-      if (currentSession?.user) {
-        // Ensure session is set before fetching profile
-        const profile = await fetchProfile(currentSession.user.id);
+      if (user) {
+        const profile = await fetchProfile(user);
         setCurrentUser(profile);
       } else {
         setCurrentUser(null);
@@ -84,21 +81,10 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setIsLoading(false);
     });
 
-    // Initial session check
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-        setSession(initialSession);
-        setSupabaseUser(initialSession?.user ?? null);
-        if (initialSession?.user) {
-            const profile = await fetchProfile(initialSession.user.id);
-            setCurrentUser(profile);
-        }
-        setIsLoading(false);
-    });
-
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [session]); // Added session dependency to ensure fetchProfile uses the latest session state
+  }, []); // Empty dependency array ensures this runs only once on mount.
 
   const isAuthenticated = !!session && !!currentUser;
 
