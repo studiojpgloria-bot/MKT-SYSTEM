@@ -5,10 +5,11 @@ import { Save, Camera } from 'lucide-react';
 interface ProfilePageProps {
   currentUser: User;
   onUpdateUser: (userId: string, updates: Partial<User>) => void;
+  onUpdateAvatar: (userId: string, file: File) => void;
   themeColor: string;
 }
 
-export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, themeColor }) => {
+export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateUser, onUpdateAvatar, themeColor }) => {
   const [name, setName] = useState(currentUser.name);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -20,8 +21,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ currentUser, onUpdateU
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const newAvatarUrl = URL.createObjectURL(e.target.files[0]);
-      onUpdateUser(currentUser.id, { avatar: newAvatarUrl });
+      onUpdateAvatar(currentUser.id, e.target.files[0]);
     }
   };
 
