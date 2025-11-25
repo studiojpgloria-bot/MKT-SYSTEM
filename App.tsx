@@ -16,6 +16,7 @@ import { useSupabaseAuth } from './hooks/useSupabaseAuth';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { supabase } from './integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 
 export const App: React.FC = () => {
   const { currentUser, isAuthenticated, isLoading: isAuthLoading } = useSupabaseAuth();
@@ -155,32 +156,49 @@ export const App: React.FC = () => {
   const handleUpdateAvatar = async (userId: string, file: File) => {
     if (!currentUser) return;
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}-${Date.now()}.${fileExt}`;
-    const filePath = `${fileName}`;
+    addNotification('Processing...', 'Resizing your image before upload.', 'info');
 
-    addNotification('Uploading...', 'Your new avatar is being uploaded.', 'info');
-    const { error: uploadError } = await supabase.storage
-      .from('avatars')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+    const options = {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1000,
+      useWebWorker: true,
+    };
 
-    if (uploadError) {
-      console.error('Error uploading avatar:', uploadError);
-      addNotification('Upload Failed', 'Could not upload your new avatar.', 'error');
-      return;
-    }
+    try {
+      const compressedFile = await imageCompression(file, options);
+      
+      const fileExt = compressedFile.name.split('.').pop();
+      const fileName = `${userId}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
 
-    const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-    
-    if (!data.publicUrl) {
-        addNotification('Update Failed', 'Could not retrieve the avatar URL.', 'error');
+      addNotification('Uploading...', 'Your new avatar is being uploaded.', 'info');
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, compressedFile, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error('Error uploading avatar:', uploadError);
+        addNotification('Upload Failed', 'Could not upload your new avatar.', 'error');
         return;
-    }
+      }
 
-    await handleUpdateUser(userId, { avatar: data.publicUrl });
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      
+      if (!data.publicUrl) {
+          addNotification('Update Failed', 'Could not retrieve the avatar URL.', 'error');
+          return;
+      }
+
+      await handleUpdateUser(userId, { avatar: data.publicUrl });
+
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      addNotification('Processing Failed', 'Could not resize the image. Please try a different one.', 'error');
+    }
   };
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
