@@ -10,6 +10,7 @@ import { NotificationToast } from './components/NotificationToast';
 import { Settings } from './components/Settings';
 import { Reports } from './components/Reports'; 
 import { ProfilePage } from './components/ProfilePage';
+import { ClientManagement } from './components/ClientManagement';
 import { INITIAL_SETTINGS, INITIAL_WORKFLOW } from './constants';
 import { Task, User, UserRole, TaskPriority, Attachment, Notification, SystemSettings, WorkflowStage, CalendarEvent, Client } from './types';
 import { useSupabaseAuth } from './hooks/useSupabaseAuth';
@@ -513,11 +514,46 @@ export const App: React.FC = () => {
       refetchData();
   };
 
+  // Client Management Handlers
+  const handleAddClient = async (clientData: Omit<Client, 'id'>) => {
+    if (!currentUser) return;
+    const { error } = await supabase.from('clients').insert({ ...clientData, creator_id: currentUser.id });
+    if (error) {
+      addNotification('Error', 'Failed to add client.', 'error');
+      console.error(error);
+    } else {
+      addNotification('Success', 'New client added.', 'success');
+      refetchData();
+    }
+  };
+
+  const handleUpdateClient = async (clientId: string, clientData: Omit<Client, 'id'>) => {
+    const { error } = await supabase.from('clients').update(clientData).eq('id', clientId);
+    if (error) {
+      addNotification('Error', 'Failed to update client.', 'error');
+      console.error(error);
+    } else {
+      addNotification('Success', 'Client details updated.', 'success');
+      refetchData();
+    }
+  };
+
+  const handleDeleteClient = async (clientId: string) => {
+    const { error } = await supabase.from('clients').delete().eq('id', clientId);
+    if (error) {
+      addNotification('Error', 'Failed to delete client. They may have associated tasks.', 'error');
+      console.error(error);
+    } else {
+      addNotification('Success', 'Client deleted.', 'warning');
+      refetchData();
+    }
+  };
+
   // Redirect to allowed view if role changes
   useEffect(() => {
      if (!isAuthenticated) return;
 
-     if ((currentView === 'approvals' || currentView === 'reports') && currentUser?.role === UserRole.MEMBER) {
+     if ((currentView === 'approvals' || currentView === 'reports' || currentView === 'clients') && currentUser?.role === UserRole.MEMBER) {
          setCurrentView('dashboard');
      }
      if (currentView === 'settings' && currentUser?.role !== UserRole.ADMIN) {
@@ -552,6 +588,29 @@ export const App: React.FC = () => {
       }))
   ];
 
+  const renderContent = () => {
+    switch (currentView) {
+      case 'dashboard':
+        return <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={handleUpdateUserStatus} onTaskClick={handleOpenTask} />;
+      case 'crm':
+        return <div className="h-full"><KanbanBoard tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} onUpdateTask={handleTaskUpdate} onTaskClick={handleOpenTask} onDeleteTask={handleDeleteTask} onExportTask={handleExportTask} onCreateTask={handleQuickCreateTask} currentUser={currentUser} /></div>;
+      case 'calendar':
+        return <CalendarView events={calendarEvents} onAddEvent={handleAddEvent} onDeleteEvent={handleDeleteEvent} />;
+      case 'clients':
+        return <ClientManagement clients={clients} onAddClient={handleAddClient} onUpdateClient={handleUpdateClient} onDeleteClient={handleDeleteClient} />;
+      case 'approvals':
+        return <ApprovalCenter tasks={tasks} onApprove={handleApproveFile} onReject={handleRejectFile} />;
+      case 'reports':
+        return <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />;
+      case 'settings':
+        return <Settings settings={settings} users={users} workflow={workflow} currentUser={currentUser} onUpdateSettings={() => { /* Placeholder */ }} onUpdateUsers={() => { /* Placeholder */ }} onUpdateWorkflow={() => { /* Placeholder */ }} onResetApp={handleResetApp} />;
+      case 'profile':
+        return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} onUpdateAvatar={handleUpdateAvatar} themeColor={settings.themeColor} />;
+      default:
+        return <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={handleUpdateUserStatus} onTaskClick={handleOpenTask} />;
+    }
+  };
+
   return (
     <Layout 
         currentUser={currentUser} 
@@ -561,76 +620,13 @@ export const App: React.FC = () => {
         onNewTask={handleNewTask}
         settings={settings}
         onToggleTheme={() => {
-            // Since we are enforcing light mode, this function does nothing or can be removed from props if possible.
             addNotification('Theme Locked', 'Dark mode is currently disabled.', 'info');
         }}
         notifications={notifications}
         onMarkRead={markNotificationRead}
         onClearNotifications={clearNotifications}
     >
-      {currentView === 'dashboard' ? (
-        <Dashboard 
-            tasks={tasks} 
-            workflow={workflow} 
-            themeColor={settings.themeColor} 
-            currentUser={currentUser} 
-            users={users}
-            notifications={notifications}
-            onUpdateUserStatus={handleUpdateUserStatus}
-            onTaskClick={handleOpenTask}
-        />
-      ) : currentView === 'crm' ? (
-        <div className="h-full">
-            <KanbanBoard 
-                tasks={tasks} 
-                users={users} 
-                workflow={workflow}
-                themeColor={settings.themeColor}
-                onUpdateTask={handleTaskUpdate}
-                onTaskClick={handleOpenTask}
-                onDeleteTask={handleDeleteTask}
-                onExportTask={handleExportTask}
-                onCreateTask={handleQuickCreateTask}
-                currentUser={currentUser}
-            />
-        </div>
-      ) : currentView === 'calendar' ? (
-        <CalendarView events={calendarEvents} onAddEvent={handleAddEvent} onDeleteEvent={handleDeleteEvent} />
-      ) : currentView === 'approvals' ? (
-        <ApprovalCenter tasks={tasks} onApprove={handleApproveFile} onReject={handleRejectFile} />
-      ) : currentView === 'reports' ? (
-        <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />
-      ) : currentView === 'settings' ? (
-        <Settings 
-            settings={settings}
-            users={users}
-            workflow={workflow}
-            currentUser={currentUser}
-            // Note: Settings persistence logic needs to be implemented in useSupabaseData or passed down.
-            onUpdateSettings={() => { /* Placeholder */ }}
-            onUpdateUsers={() => { /* Placeholder */ }}
-            onUpdateWorkflow={() => { /* Placeholder */ }}
-            onResetApp={handleResetApp}
-        />
-      ) : currentView === 'profile' ? (
-        <ProfilePage 
-            currentUser={currentUser}
-            onUpdateUser={handleUpdateUser}
-            onUpdateAvatar={handleUpdateAvatar}
-            themeColor={settings.themeColor}
-        />
-      ) : (
-        <Dashboard 
-            tasks={tasks} 
-            workflow={workflow} 
-            themeColor={settings.themeColor} 
-            currentUser={currentUser} 
-            users={users}
-            notifications={notifications}
-            onUpdateUserStatus={handleUpdateUserStatus}
-            onTaskClick={handleOpenTask}
-        />
-      )}
+      {renderContent()}
 
       {/* Transient Toasts */}
       <div className="fixed top-4 right-4 z-[60] space-y-3 pointer-events-none">

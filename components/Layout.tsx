@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, User as UserIcon } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, User as UserIcon, Briefcase } from 'lucide-react';
 import { User, UserRole, SystemSettings, Notification } from '../types';
 
 interface LayoutProps {
@@ -56,6 +56,7 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
     { id: 'crm', label: 'CRM Kanban', icon: Kanban, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
     { id: 'calendar', label: 'Calendar', icon: CalendarIcon, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
+    { id: 'clients', label: 'Clients', icon: Briefcase, roles: [UserRole.ADMIN, UserRole.MANAGER] },
     { id: 'approvals', label: 'Approvals', icon: CheckCircle, roles: [UserRole.ADMIN, UserRole.MANAGER] },
     { id: 'reports', label: 'Reports', icon: FileBarChart, roles: [UserRole.ADMIN, UserRole.MANAGER] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: [UserRole.ADMIN] },
@@ -145,7 +146,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
                   currentView === item.id
                     ? getActiveNavClass()
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    ? 'text-slate-400 hover:bg-slate-800 hover:text-white'
                 }`}
               >
                 <item.icon size={22} strokeWidth={1.5} />
