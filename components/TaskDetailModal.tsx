@@ -135,6 +135,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     return `${m}m`;
   };
 
+  const formatDateForInput = (dateValue: string | number | null | undefined): string => {
+    if (!dateValue) return '';
+    try {
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) return '';
+        return date.toISOString().split('T')[0];
+    } catch (error) {
+        return '';
+    }
+  };
+
   const assignee = users.find(u => u.id === editedTask.assigneeId);
   const client = clients.find(c => c.id === editedTask.clientId);
   const isAssignee = currentUser.id === editedTask.assigneeId;
@@ -561,10 +572,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <input 
                             type="date"
                             readOnly={!isAdminOrManager}
-                            value={new Date(editedTask.dueDate).toISOString().split('T')[0]}
+                            value={formatDateForInput(editedTask.dueDate)}
                             onChange={(e) => {
-                                const date = new Date(e.target.value);
-                                handleSaveField('dueDate', date.getTime());
+                                if (e.target.value) {
+                                    const date = new Date(e.target.value);
+                                    handleSaveField('dueDate', date.getTime());
+                                } else {
+                                    handleSaveField('dueDate', null);
+                                }
                             }}
                             className="flex-1 bg-transparent text-sm text-gray-700 border-none focus:ring-0 p-0"
                         />
