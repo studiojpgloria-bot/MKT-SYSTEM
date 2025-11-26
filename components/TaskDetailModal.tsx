@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, Cloud, HardDrive, FileText, CheckSquare, GripVertical, Briefcase, Link as LinkIcon } from 'lucide-react';
+import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, HardDrive, FileText, CheckSquare, GripVertical, Briefcase, Link as LinkIcon } from 'lucide-react';
 import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask, Client, Attachment } from '../types';
 
 // Helper to get a consistent color for a tag
@@ -31,7 +31,6 @@ interface TaskDetailModalProps {
   onAddComment: (taskId: string, text: string) => void;
   onDelete: (taskId: string) => void;
   onUpload: (taskId: string, file: File) => void;
-  onCloudImport: (taskId: string, service: string) => void;
   onLinkImport: (taskId: string, url: string) => void;
   onAccept: (taskId: string) => void;
   onApprove: (taskId: string, attachmentId: string) => void;
@@ -50,7 +49,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onAddComment,
   onDelete,
   onUpload,
-  onCloudImport,
   onLinkImport,
   onAccept,
   onApprove,
@@ -61,12 +59,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [newTag, setNewTag] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
   const [addTimeAmount, setAddTimeAmount] = useState(30);
-  const [showCloudMenu, setShowCloudMenu] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cloudMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setEditedTask(task);
@@ -75,16 +71,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         setLinkUrl('');
     }
   }, [task, isOpen]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (cloudMenuRef.current && !cloudMenuRef.current.contains(event.target as Node)) {
-        setShowCloudMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   if (!isOpen || !editedTask) return null;
 
@@ -368,29 +354,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                  />
                  
                  {(!isInReview && !isApproved || isAdminOrManager) && (
-                     <div className="flex items-center gap-2" ref={cloudMenuRef}>
-                        <div className="relative">
-                           <button 
-                                onClick={() => setShowCloudMenu(!showCloudMenu)}
-                                className="text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors text-gray-600 hover:bg-gray-100 border border-gray-200"
-                           >
-                              <Cloud size={12} /> Import
-                           </button>
-                           
-                           {showCloudMenu && (
-                             <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                                <button onClick={() => { onCloudImport(editedTask.id, 'google_drive'); setShowCloudMenu(false); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-2">
-                                  <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" className="w-4 h-4" alt="Drive"/> Google Drive
-                                </button>
-                                <button onClick={() => { onCloudImport(editedTask.id, 'dropbox'); setShowCloudMenu(false); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-2">
-                                  <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Dropbox_Icon.svg" className="w-4 h-4" alt="Dropbox"/> Dropbox
-                                </button>
-                                <button onClick={() => { onCloudImport(editedTask.id, 'onedrive'); setShowCloudMenu(false); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-2">
-                                  <img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Microsoft_Office_OneDrive_%282019%E2%80%93present%29.svg" className="w-4 h-4" alt="OneDrive"/> OneDrive
-                                </button>
-                             </div>
-                           )}
-                        </div>
+                     <div className="flex items-center gap-2">
                         <button 
                            onClick={() => setShowLinkInput(true)}
                            className="text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors text-gray-600 hover:bg-gray-100 border border-gray-200"
@@ -507,7 +471,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     >
                         <div className="flex justify-center gap-4 mb-2 opacity-40 group-hover:opacity-60 transition-opacity">
                            <HardDrive size={24} />
-                           <Cloud size={24} />
                         </div>
                         <p className="text-sm text-gray-400">Drag files here, click to upload, or use Import</p>
                     </div>
