@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, User as UserIcon, Building, Palette, Shield, Bell, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon } from 'lucide-react';
 import { SystemSettings, User, UserRole, WorkflowStage } from '../types';
 import { InviteMemberModal } from './InviteMemberModal';
@@ -30,6 +30,12 @@ export const Settings: React.FC<SettingsProps> = ({
   const [localWorkflow, setLocalWorkflow] = useState(workflow);
   const [newStage, setNewStage] = useState('');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+
+  // Sync local state with props when they change
+  useEffect(() => {
+    setLocalSettings(settings);
+    setLocalWorkflow(workflow);
+  }, [settings, workflow]);
   
   const handleSave = () => {
     onSave(localSettings, localWorkflow);
