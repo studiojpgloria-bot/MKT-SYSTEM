@@ -164,6 +164,44 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleUpdateUserRole = async (userId: string, role: UserRole) => {
+    if (currentUser?.role !== UserRole.ADMIN) {
+        addNotification('Permission Denied', 'Only admins can change user roles.', 'error');
+        return;
+    }
+    const { error } = await supabase
+        .from('profiles')
+        .update({ role })
+        .eq('id', userId);
+
+    if (error) {
+        addNotification('Update Failed', `Could not update role for user.`, 'error');
+        console.error(error);
+    } else {
+        addNotification('Role Updated', 'User role has been successfully changed.', 'success');
+        refetchData();
+    }
+  };
+
+  const handleSaveSettings = async (newSettings: SystemSettings, newWorkflow: WorkflowStage[]) => {
+    if (currentUser?.role !== UserRole.ADMIN) {
+        addNotification('Permission Denied', 'Only admins can change system settings.', 'error');
+        return;
+    }
+    const { error } = await supabase
+        .from('app_settings')
+        .update({ system_settings: newSettings, workflow: newWorkflow })
+        .eq('id', 1);
+
+    if (error) {
+        addNotification('Save Failed', 'Could not save settings to the database.', 'error');
+        console.error(error);
+    } else {
+        addNotification('Settings Saved', 'System settings have been updated.', 'success');
+        refetchData();
+    }
+  };
+
   const handleUpdateAvatar = async (userId: string, file: File) => {
     if (!currentUser) return;
 
@@ -603,7 +641,7 @@ export const App: React.FC = () => {
       case 'reports':
         return <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />;
       case 'settings':
-        return <Settings settings={settings} users={users} workflow={workflow} currentUser={currentUser} onUpdateSettings={() => { /* Placeholder */ }} onUpdateUsers={() => { /* Placeholder */ }} onUpdateWorkflow={() => { /* Placeholder */ }} onResetApp={handleResetApp} />;
+        return <Settings settings={settings} users={users} workflow={workflow} currentUser={currentUser} onSave={handleSaveSettings} onUpdateUserRole={handleUpdateUserRole} onResetApp={handleResetApp} />;
       case 'profile':
         return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} onUpdateAvatar={handleUpdateAvatar} themeColor={settings.themeColor} />;
       default:

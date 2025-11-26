@@ -6,9 +6,8 @@ interface SettingsProps {
   settings: SystemSettings;
   users: User[];
   workflow: WorkflowStage[];
-  onUpdateSettings: (settings: SystemSettings) => void;
-  onUpdateUsers: (users: User[]) => void;
-  onUpdateWorkflow: (workflow: WorkflowStage[]) => void;
+  onSave: (settings: SystemSettings, workflow: WorkflowStage[]) => void;
+  onUpdateUserRole: (userId: string, role: UserRole) => void;
   onResetApp: () => void;
   currentUser: User;
 }
@@ -17,9 +16,8 @@ export const Settings: React.FC<SettingsProps> = ({
   settings,
   users,
   workflow,
-  onUpdateSettings,
-  onUpdateUsers,
-  onUpdateWorkflow,
+  onSave,
+  onUpdateUserRole,
   onResetApp,
   currentUser
 }) => {
@@ -27,51 +25,21 @@ export const Settings: React.FC<SettingsProps> = ({
   
   // Local state for forms
   const [localSettings, setLocalSettings] = useState(settings);
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: UserRole.MEMBER });
+  const [localWorkflow, setLocalWorkflow] = useState(workflow);
   const [newStage, setNewStage] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSaveSettings = () => {
-    onUpdateSettings(localSettings);
-    // Simulate toast notification here in parent
+  const handleSave = () => {
+    onSave(localSettings, localWorkflow);
   };
 
-  const handleAddUser = () => {
-    if (newUser.name && newUser.email) {
-      const user: User = {
-        id: `u${Date.now()}`,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-        avatar: `https://ui-avatars.com/api/?name=${newUser.name.replace(' ', '+')}&background=random`,
-        status: 'offline',
-        lastSeen: Date.now()
-      };
-      onUpdateUsers([...users, user]);
-      setNewUser({ name: '', email: '', role: UserRole.MEMBER });
-    }
-  };
-
-  const handleRemoveUser = (id: string) => {
-    if (confirm('Are you sure you want to remove this user?')) {
-      onUpdateUsers(users.filter(u => u.id !== id));
-    }
-  };
-  
   const handleRoleChange = (userId: string, newRole: UserRole) => {
-    const updatedUsers = users.map(u => 
-        u.id === userId ? { ...u, role: newRole } : u
-    );
-    onUpdateUsers(updatedUsers);
+    onUpdateUserRole(userId, newRole);
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const mockUrl = URL.createObjectURL(e.target.files[0]);
-      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, avatar: mockUrl } : u);
-      onUpdateUsers(updatedUsers);
-    }
+    // This functionality is now on the Profile page, this is just a display
   };
 
   const handleAddStage = () => {
@@ -81,18 +49,18 @@ export const Settings: React.FC<SettingsProps> = ({
         name: newStage,
         color: 'indigo'
       };
-      onUpdateWorkflow([...workflow, stage]);
+      setLocalWorkflow([...localWorkflow, stage]);
       setNewStage('');
     }
   };
 
   const handleRemoveStage = (id: string) => {
-    if (workflow.length <= 3) {
+    if (localWorkflow.length <= 3) {
       alert('You must have at least 3 stages in the workflow.');
       return;
     }
     if (confirm('Deleting a stage will affect tasks currently in this stage. Continue?')) {
-      onUpdateWorkflow(workflow.filter(s => s.id !== id));
+      setLocalWorkflow(localWorkflow.filter(s => s.id !== id));
     }
   };
 
@@ -184,13 +152,9 @@ export const Settings: React.FC<SettingsProps> = ({
                       <div>
                           <p className="font-bold text-gray-900 dark:text-white">{currentUser.name}</p>
                           <p className="text-sm text-gray-500 dark:text-slate-400">{currentUser.email}</p>
-                          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarChange} />
-                          <button 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="mt-2 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 font-medium"
-                          >
-                            Change Photo
-                          </button>
+                          <p className="mt-2 text-xs text-gray-400">
+                            To change your photo, go to 'My Profile'.
+                          </p>
                       </div>
                    </div>
                 </div>
@@ -205,50 +169,9 @@ export const Settings: React.FC<SettingsProps> = ({
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">Team Management</h3>
                   <span className="text-sm text-gray-500 dark:text-slate-400">{users.length} active members</span>
                </div>
-
-               {/* Add User */}
-               <div className="bg-gray-50 dark:bg-slate-800/50 p-4 rounded-xl border border-gray-200 dark:border-slate-700 mb-6">
-                  <h4 className="text-sm font-bold text-gray-700 dark:text-slate-300 mb-3">Add New Member</h4>
-                  <div className="flex gap-3 items-end">
-                      <div className="flex-1">
-                          <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Full Name</label>
-                          <input 
-                              type="text" 
-                              value={newUser.name}
-                              onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                              className="w-full p-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-lg text-sm"
-                              placeholder="e.g. John Doe"
-                          />
-                      </div>
-                      <div className="flex-1">
-                          <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Email Address</label>
-                          <input 
-                              type="email" 
-                              value={newUser.email}
-                              onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                              className="w-full p-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-lg text-sm"
-                              placeholder="john@company.com"
-                          />
-                      </div>
-                      <div className="w-40">
-                          <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Role</label>
-                          <select 
-                               value={newUser.role}
-                               onChange={(e) => setNewUser({...newUser, role: e.target.value as UserRole})}
-                               className="w-full p-2 border border-gray-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-lg text-sm"
-                          >
-                              {Object.values(UserRole).map(role => (
-                                  <option key={role} value={role}>{role}</option>
-                              ))}
-                          </select>
-                      </div>
-                      <button 
-                          onClick={handleAddUser}
-                          className={`px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors bg-${localSettings.themeColor}-600 hover:bg-${localSettings.themeColor}-700`}
-                      >
-                          <Plus size={18} />
-                      </button>
-                  </div>
+               
+               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 text-sm text-blue-700 dark:text-blue-300">
+                  For security, new users should be invited via the Supabase dashboard. Here you can manage their roles within the application.
                </div>
 
                {/* User List */}
@@ -266,7 +189,7 @@ export const Settings: React.FC<SettingsProps> = ({
                                         </span>
                                     )}
                                   </p>
-                                  <p className="text-xs text-gray-500 dark:text-slate-400">{user.email}</p>
+                                  <p className="text-xs text-gray-500 dark:text-slate-400">{user.email || 'No email provided'}</p>
                               </div>
                           </div>
                           <div className="flex items-center gap-4">
@@ -280,14 +203,6 @@ export const Settings: React.FC<SettingsProps> = ({
                                       <option key={role} value={role}>{role}</option>
                                   ))}
                               </select>
-                              {user.id !== currentUser.id && (
-                                  <button 
-                                      onClick={() => handleRemoveUser(user.id)}
-                                      className="text-gray-400 hover:text-red-600 transition-colors"
-                                  >
-                                      <Trash2 size={16} />
-                                  </button>
-                              )}
                           </div>
                       </div>
                   ))}
@@ -304,7 +219,7 @@ export const Settings: React.FC<SettingsProps> = ({
                </div>
 
                <div className="space-y-3 max-w-2xl">
-                   {workflow.map((stage, index) => (
+                   {localWorkflow.map((stage, index) => (
                        <div key={stage.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg group">
                            <div className="text-gray-400 cursor-grab active:cursor-grabbing">
                                <GripVertical size={16} />
@@ -514,7 +429,7 @@ export const Settings: React.FC<SettingsProps> = ({
         {/* Footer Actions (Sticky to bottom of container) */}
         <div className="p-6 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800 flex justify-end z-10">
             <button 
-              onClick={handleSaveSettings}
+              onClick={handleSave}
               className={`flex items-center gap-2 px-6 py-2 bg-${localSettings.themeColor}-600 text-white rounded-lg font-bold shadow-md hover:bg-${localSettings.themeColor}-700 transition-colors`}
             >
                 <Save size={18} />

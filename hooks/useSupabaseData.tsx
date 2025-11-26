@@ -27,53 +27,11 @@ export const useSupabaseData = (): SupabaseData => {
   const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
   const [dataLoading, setDataLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false); // New state for initial local load
 
   const refetchData = () => setRefreshKey(prev => prev + 1);
 
-  // 1. Load local settings/workflow (runs once, synchronously)
   useEffect(() => {
-    const savedSettings = localStorage.getItem('nexus_settings');
-    if (savedSettings) {
-        try {
-            setSettings(JSON.parse(savedSettings));
-        } catch (e) {
-            console.error("Error parsing saved settings:", e);
-        }
-    }
-    
-    const savedWorkflow = localStorage.getItem('nexus_workflow');
-    if (savedWorkflow) {
-        try {
-            setWorkflow(JSON.parse(savedWorkflow));
-        } catch (e) {
-            console.error("Error parsing saved workflow:", e);
-        }
-    }
-    
-    setInitialLoadComplete(true);
-  }, []);
-
-  // 2. Persist local settings/workflow (runs on change)
-  useEffect(() => {
-    if (initialLoadComplete) {
-        localStorage.setItem('nexus_settings', JSON.stringify(settings));
-    }
-  }, [settings, initialLoadComplete]);
-
-  useEffect(() => {
-    if (initialLoadComplete) {
-        localStorage.setItem('nexus_workflow', JSON.stringify(workflow));
-    }
-  }, [workflow, initialLoadComplete]);
-
-
-  // 3. Fetch remote data (runs on auth change or refresh, only after local load)
-  useEffect(() => {
-    if (!initialLoadComplete) return;
-
     if (!isAuthenticated || !currentUser) {
-      // If not authenticated, ensure data is cleared and loading is false
       setTasks([]);
       setEvents([]);
       setAllUsers([]);
@@ -85,6 +43,24 @@ export const useSupabaseData = (): SupabaseData => {
 
     const fetchAllData = async () => {
       setDataLoading(true);
+
+      // Fetch App Settings & Workflow
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('app_settings')
+        .select('workflow, system_settings')
+        .eq('id', 1)
+        .single();
+
+      if (settingsData && !settingsError) {
+        if (settingsData.system_settings) {
+          setSettings(settingsData.system_settings as SystemSettings);
+        }
+        if (settingsData.workflow) {
+          setWorkflow(settingsData.workflow as WorkflowStage[]);
+        }
+      } else {
+        console.warn('Could not fetch app_settings. Using initial defaults.');
+      }
 
       // Fetch All Users (Profiles)
       const { data: usersData, error: usersError } = await supabase
@@ -162,7 +138,7 @@ export const useSupabaseData = (): SupabaseData => {
     };
 
     fetchAllData();
-  }, [isAuthenticated, currentUser?.id, refreshKey, initialLoadComplete]);
+  }, [isAuthenticated, currentUser?.id, refreshKey]);
 
   return {
     tasks,
@@ -172,7 +148,7 @@ export const useSupabaseData = (): SupabaseData => {
     notifications,
     workflow,
     settings,
-    dataLoading: dataLoading || !initialLoadComplete,
+    dataLoading,
     refetchData,
   };
 };
