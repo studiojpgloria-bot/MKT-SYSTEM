@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Save, User as UserIcon, Building, Palette, Shield, Bell, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon } from 'lucide-react';
 import { SystemSettings, User, UserRole, WorkflowStage } from '../types';
+import { InviteMemberModal } from './InviteMemberModal'; // Importar o novo modal
 
 interface SettingsProps {
   settings: SystemSettings;
@@ -10,6 +11,7 @@ interface SettingsProps {
   onUpdateUserRole: (userId: string, role: UserRole) => void;
   onResetApp: () => void;
   currentUser: User;
+  onInviteNewMember: (email: string, password: string, name: string) => void; // Nova prop
 }
 
 export const Settings: React.FC<SettingsProps> = ({
@@ -19,7 +21,8 @@ export const Settings: React.FC<SettingsProps> = ({
   onSave,
   onUpdateUserRole,
   onResetApp,
-  currentUser
+  currentUser,
+  onInviteNewMember // Nova prop
 }) => {
   const [activeTab, setActiveTab] = useState<'company' | 'team' | 'workflow' | 'appearance' | 'security' | 'login'>('company');
   
@@ -27,6 +30,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [localSettings, setLocalSettings] = useState(settings);
   const [localWorkflow, setLocalWorkflow] = useState(workflow);
   const [newStage, setNewStage] = useState('');
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false); // Novo estado para o modal de convite
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -130,7 +134,7 @@ export const Settings: React.FC<SettingsProps> = ({
                    <div className="flex gap-4 items-center">
                       <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden">
                           {localSettings.companyLogo ? (
-                              <img src={localSettings.companyLogo} alt="Logo" className="w-full h-full object-cover" />
+                              <img src={localSettings.companyLogo} alt="Logo" className="w-full h-full object-contain" />
                           ) : (
                               <Building size={20} className="text-gray-400" />
                           )}
@@ -167,11 +171,28 @@ export const Settings: React.FC<SettingsProps> = ({
              <div className="space-y-6 animate-in fade-in duration-300">
                <div className="flex justify-between items-center border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">Team Management</h3>
-                  <span className="text-sm text-gray-500 dark:text-slate-400">{users.length} active members</span>
+                  {currentUser.role === UserRole.ADMIN && (
+                      <button 
+                          onClick={() => setIsInviteModalOpen(true)}
+                          className={`flex items-center gap-2 px-4 py-2 bg-${localSettings.themeColor}-600 text-white rounded-lg text-sm font-medium hover:bg-${localSettings.themeColor}-700 transition-colors shadow-sm`}
+                      >
+                          <Plus size={16} /> Convidar Membro
+                      </button>
+                  )}
                </div>
                
                <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 text-sm text-blue-700 dark:text-blue-300">
-                  For security, new users should be invited via the Supabase dashboard. Here you can manage their roles within the application.
+                  {currentUser.role === UserRole.ADMIN ? (
+                      <>
+                          Você pode convidar novos membros diretamente aqui. Para administradores, o cadastro deve ser feito via painel do Supabase.
+                          <br/>
+                          Gerencie os cargos dos membros abaixo.
+                      </>
+                  ) : (
+                      <>
+                          Para convidar novos usuários ou gerenciar cargos, entre em contato com um administrador.
+                      </>
+                  )}
                </div>
 
                {/* User List */}
@@ -185,7 +206,7 @@ export const Settings: React.FC<SettingsProps> = ({
                                     {user.name}
                                     {user.id === currentUser.id && (
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-${localSettings.themeColor}-100 dark:bg-${localSettings.themeColor}-900/50 text-${localSettings.themeColor}-700 dark:text-${localSettings.themeColor}-300`}>
-                                            You
+                                            Você
                                         </span>
                                     )}
                                   </p>
@@ -196,7 +217,7 @@ export const Settings: React.FC<SettingsProps> = ({
                               <select 
                                   value={user.role}
                                   onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                                  disabled={user.id === currentUser.id}
+                                  disabled={user.id === currentUser.id || currentUser.role !== UserRole.ADMIN} // Apenas ADMIN pode mudar cargos
                                   className="text-xs font-bold p-2 rounded-lg bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-transparent focus:ring-2 focus:ring-indigo-500 disabled:opacity-70 disabled:cursor-not-allowed"
                               >
                                   {Object.values(UserRole).map(role => (
@@ -438,6 +459,13 @@ export const Settings: React.FC<SettingsProps> = ({
         </div>
 
       </div>
+
+      <InviteMemberModal 
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
+        onInvite={onInviteNewMember}
+        themeColor={localSettings.themeColor}
+      />
     </div>
   );
 };

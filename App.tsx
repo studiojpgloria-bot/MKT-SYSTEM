@@ -183,6 +183,34 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleInviteNewMember = async (email: string, password: string, name: string) => {
+    if (currentUser?.role !== UserRole.ADMIN) {
+        addNotification('Permission Denied', 'Only admins can invite new members.', 'error');
+        return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            data: {
+                name: name, // Pass name to user_metadata for the trigger
+            },
+        },
+    });
+
+    if (error) {
+        addNotification('Invite Failed', `Could not invite member: ${error.message}`, 'error');
+        console.error('Error inviting new member:', error);
+    } else if (data.user) {
+        addNotification('Member Invited', `An invitation email has been sent to ${email}.`, 'success');
+        refetchData(); // Refresh user list to show new member once confirmed
+    } else {
+        addNotification('Invite Sent', `An invitation email has been sent to ${email}.`, 'info');
+        refetchData();
+    }
+  };
+
   const handleSaveSettings = async (newSettings: SystemSettings, newWorkflow: WorkflowStage[]) => {
     if (currentUser?.role !== UserRole.ADMIN) {
         addNotification('Permission Denied', 'Only admins can change system settings.', 'error');
@@ -658,7 +686,16 @@ export const App: React.FC = () => {
       case 'reports':
         return <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />;
       case 'settings':
-        return <Settings settings={settings} users={users} workflow={workflow} currentUser={currentUser} onSave={handleSaveSettings} onUpdateUserRole={handleUpdateUserRole} onResetApp={handleResetApp} />;
+        return <Settings 
+                  settings={settings} 
+                  users={users} 
+                  workflow={workflow} 
+                  currentUser={currentUser} 
+                  onSave={handleSaveSettings} 
+                  onUpdateUserRole={handleUpdateUserRole} 
+                  onResetApp={handleResetApp} 
+                  onInviteNewMember={handleInviteNewMember} // Passar a nova função
+                />;
       case 'profile':
         return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} onUpdateAvatar={handleUpdateAvatar} themeColor={settings.themeColor} />;
       default:
