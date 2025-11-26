@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, CheckCircle, AlertCircle, Clock, Timer, User as UserIcon, Coffee, Wifi, Activity, ChevronRight, PlayCircle } from 'lucide-react';
 import { Task, DashboardMetrics, WorkflowStage, User, UserRole, Notification } from '../types';
@@ -26,35 +26,37 @@ export const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const isMember = currentUser.role === UserRole.MEMBER;
 
-  // 1. Logic for Pending Tasks Widget
-  const pendingTasksList = tasks
+  // 1. Logic for Pending Tasks Widget (Memoized)
+  const pendingTasksList = useMemo(() => tasks
     .filter(t => isMember ? t.assigneeId === currentUser.id : true)
     .filter(t => t.stage !== 'approved' && t.stage !== 'published')
     .sort((a, b) => a.dueDate - b.dueDate) 
-    .slice(0, 4); // Show top 4 to fit height
+    .slice(0, 4), [tasks, isMember, currentUser.id]);
 
-  // 2. Logic for Metrics
-  const relevantTasks = isMember 
-    ? tasks.filter(t => t.assigneeId === currentUser.id) 
-    : tasks;
+  // 2. Logic for Metrics (Memoized)
+  const metrics: DashboardMetrics = useMemo(() => {
+    const relevantTasks = isMember 
+      ? tasks.filter(t => t.assigneeId === currentUser.id) 
+      : tasks;
 
-  const tasksWithTime = relevantTasks.filter(t => t.timeSpent > 0);
-  const totalTimeMinutes = tasksWithTime.reduce((acc, t) => acc + t.timeSpent, 0);
-  const avgTimeMinutes = tasksWithTime.length > 0 ? Math.round(totalTimeMinutes / tasksWithTime.length) : 0;
+    const tasksWithTime = relevantTasks.filter(t => t.timeSpent > 0);
+    const totalTimeMinutes = tasksWithTime.reduce((acc, t) => acc + t.timeSpent, 0);
+    const avgTimeMinutes = tasksWithTime.length > 0 ? Math.round(totalTimeMinutes / tasksWithTime.length) : 0;
+
+    return {
+      activeCampaigns: isMember ? 0 : 5, // Mock data
+      pendingTasks: relevantTasks.filter(t => t.stage !== 'published' && t.stage !== 'approved').length,
+      approvalRate: isMember ? 90 : 85, // Mock data
+      completedThisMonth: relevantTasks.filter(t => t.stage === 'approved' || t.stage === 'published').length,
+      avgProductionTime: avgTimeMinutes,
+    };
+  }, [tasks, isMember, currentUser.id]);
 
   const formatTime = (minutes: number) => {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
     if (h > 0) return `${h}h ${m}m`;
     return `${m}m`;
-  };
-
-  const metrics: DashboardMetrics = {
-    activeCampaigns: isMember ? 0 : 5,
-    pendingTasks: relevantTasks.filter(t => t.stage !== 'published' && t.stage !== 'approved').length,
-    approvalRate: isMember ? 90 : 85,
-    completedThisMonth: relevantTasks.filter(t => t.stage === 'approved' || t.stage === 'published').length,
-    avgProductionTime: avgTimeMinutes,
   };
 
   // Chart Data

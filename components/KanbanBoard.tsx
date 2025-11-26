@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { MoreHorizontal, Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, Trash2, Check, Download, CheckSquare } from 'lucide-react';
 import { Task, TaskPriority, User, WorkflowStage, UserRole } from '../types';
 import { QuickTaskForm } from './QuickTaskForm';
@@ -135,7 +135,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
   };
 
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = useMemo(() => tasks.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                             (task.clients?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                             task.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -145,7 +145,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       const matchesAssignee = assigneeFilter === 'ALL' || task.assigneeId === assigneeFilter;
 
       return matchesSearch && matchesPriority && matchesAssignee;
-  });
+  }), [tasks, searchQuery, priorityFilter, assigneeFilter]);
 
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     setDraggedTaskId(taskId);

@@ -1,4 +1,4 @@
-import { Task, TaskPriority, TaskStage, User, UserRole, CalendarEvent, SystemSettings, WorkflowStage } from './types';
+import { SystemSettings, WorkflowStage } from './types';
 
 // Initial Workflow
 export const INITIAL_WORKFLOW: WorkflowStage[] = [
@@ -29,8 +29,3 @@ export const INITIAL_SETTINGS: SystemSettings = {
         bannerUrl: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1567&q=80'
     }
 };
-
-// Empty arrays for data now managed by Supabase
-export const MOCK_USERS: User[] = [];
-export const INITIAL_TASKS: Task[] = [];
-export const INITIAL_EVENTS: CalendarEvent[] = [];

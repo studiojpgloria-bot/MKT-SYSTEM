@@ -85,7 +85,7 @@ export const App: React.FC = () => {
               read: false,
           });
           if (error) console.error('Error saving notification:', error);
-          refetchData(); // Refresh notification list
+          refetchData('notifications'); // Refresh notification list
       }
   };
 
@@ -96,14 +96,14 @@ export const App: React.FC = () => {
   const markNotificationRead = async (id: string) => {
       const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
       if (error) console.error('Error marking notification read:', error);
-      refetchData();
+      refetchData('notifications');
   };
   
   const clearNotifications = async () => {
       // Note: RLS should ensure users can only delete their own notifications
       const { error } = await supabase.from('notifications').delete().eq('user_id', currentUser?.id);
       if (error) console.error('Error clearing notifications:', error);
-      refetchData();
+      refetchData('notifications');
   };
 
   // Reset Logic (Only resets local settings/workflow, not Supabase data)
@@ -111,7 +111,7 @@ export const App: React.FC = () => {
       localStorage.clear();
       
       addNotification('System Reset', 'Local settings have been restored to defaults.', 'info');
-      refetchData();
+      refetchData('all');
   };
 
   // Auth Handlers
@@ -160,7 +160,7 @@ export const App: React.FC = () => {
         addNotification('Falha na Atualização', 'Não foi possível salvar as alterações no perfil.', 'error');
     } else {
         addNotification('Perfil Atualizado', 'Suas alterações foram salvas com sucesso.', 'success');
-        refetchData();
+        refetchData('users');
     }
   };
 
@@ -179,7 +179,7 @@ export const App: React.FC = () => {
         console.error(error);
     } else {
         addNotification('Role Updated', 'User role has been successfully changed.', 'success');
-        refetchData();
+        refetchData('users');
     }
   };
 
@@ -204,10 +204,10 @@ export const App: React.FC = () => {
         console.error('Error inviting new member:', error);
     } else if (data.user) {
         addNotification('Member Invited', `An invitation email has been sent to ${email}.`, 'success');
-        refetchData(); // Refresh user list to show new member once confirmed
+        refetchData('users'); // Refresh user list to show new member once confirmed
     } else {
         addNotification('Invite Sent', `An invitation email has been sent to ${email}.`, 'info');
-        refetchData();
+        refetchData('users');
     }
   };
 
@@ -226,7 +226,7 @@ export const App: React.FC = () => {
         console.error(error);
     } else {
         addNotification('Settings Saved', 'System settings have been updated.', 'success');
-        refetchData();
+        refetchData('settings');
     }
   };
 
@@ -286,7 +286,7 @@ export const App: React.FC = () => {
         .eq('id', taskId);
     
     if (error) console.error('Error updating task:', error);
-    refetchData();
+    refetchData('tasks');
   };
 
   const handleAcceptTask = async (taskId: string) => {
@@ -297,7 +297,7 @@ export const App: React.FC = () => {
     
     if (error) console.error('Error accepting task:', error);
     addNotification('Task Accepted', 'Task moved to Design stage.', 'success');
-    refetchData();
+    refetchData('tasks');
   };
 
   const handleDeleteTask = async (taskId: string) => {
@@ -312,7 +312,7 @@ export const App: React.FC = () => {
         setSelectedTaskId(null);
     }
     addNotification('Task Deleted', 'The task has been permanently removed.', 'warning');
-    refetchData();
+    refetchData('tasks');
   };
   
   const handleExportTask = (taskId: string) => {
@@ -433,7 +433,7 @@ export const App: React.FC = () => {
         .eq('id', taskId);
     
     if (error) console.error('Error updating task with attachment:', error);
-    refetchData();
+    refetchData('tasks');
   };
 
   const handleAddComment = async (taskId: string, text: string) => {
@@ -455,7 +455,7 @@ export const App: React.FC = () => {
           .eq('id', taskId);
       
       if (error) console.error('Error adding comment:', error);
-      refetchData();
+      refetchData('tasks');
   };
 
   const handleApproveFile = async (taskId: string, attachmentId: string) => {
@@ -474,7 +474,7 @@ export const App: React.FC = () => {
     
     if (error) console.error('Error approving file:', error);
     addNotification('Asset Approved', 'Task moved to Approved stage.', 'success');
-    refetchData();
+    refetchData('tasks');
   };
 
   const handleRejectFile = async (taskId: string, attachmentId: string, feedback?: string) => {
@@ -493,7 +493,7 @@ export const App: React.FC = () => {
     
     if (error) console.error('Error rejecting file:', error);
     addNotification('Revisão Solicitada', 'A tarefa retornou para o estágio de Design.', 'warning');
-    refetchData();
+    refetchData('tasks');
   };
 
   const handleOpenTask = (taskId: string) => {
@@ -534,7 +534,7 @@ export const App: React.FC = () => {
           setSelectedTaskId(data.id);
           setIsTaskModalOpen(true);
           addNotification('Task Created', 'New task added to Briefing.', 'success');
-          refetchData();
+          refetchData('tasks');
       }
   };
   
@@ -565,7 +565,7 @@ export const App: React.FC = () => {
           addNotification('Task Creation Failed', 'Could not create new task.', 'error');
       } else {
           addNotification('Task Created', `Added "${title}" to ${workflow.find(w => w.id === stageId)?.name}`, 'success');
-          refetchData();
+          refetchData('tasks');
       }
   };
 
@@ -587,14 +587,14 @@ export const App: React.FC = () => {
       const { error } = await supabase.from('calendar_events').insert(newEvent);
       if (error) console.error('Error adding event:', error);
       addNotification('Event Created', `Added "${event.title}" to calendar.`, 'success');
-      refetchData();
+      refetchData('events');
   };
 
   const handleDeleteEvent = async (id: string) => {
       const { error } = await supabase.from('calendar_events').delete().eq('id', id);
       if (error) console.error('Error deleting event:', error);
       addNotification('Event Deleted', 'Calendar event removed.', 'info');
-      refetchData();
+      refetchData('events');
   };
 
   // Client Management Handlers
@@ -606,7 +606,7 @@ export const App: React.FC = () => {
       console.error(error);
     } else {
       addNotification('Success', 'New client added.', 'success');
-      refetchData();
+      refetchData('clients');
     }
   };
 
@@ -617,7 +617,7 @@ export const App: React.FC = () => {
       console.error(error);
     } else {
       addNotification('Success', 'Client details updated.', 'success');
-      refetchData();
+      refetchData('clients');
     }
   };
 
@@ -628,7 +628,7 @@ export const App: React.FC = () => {
       console.error(error);
     } else {
       addNotification('Success', 'Client deleted.', 'warning');
-      refetchData();
+      refetchData('clients');
     }
   };
 
