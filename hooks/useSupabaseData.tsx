@@ -67,22 +67,28 @@ export const useSupabaseData = (): SupabaseData => {
         .from('profiles')
         .select('id, name, role, avatar_url');
       
+      let fetchedUsers: User[] = [];
       if (usersData && !usersError) {
-        const fetchedUsers: User[] = usersData.map(p => ({
+        fetchedUsers = usersData.map(p => ({
             id: p.id,
             name: p.name || 'Unknown User',
             role: p.role as UserRole,
-            avatar: p.avatar_url || 'https://ui-avatars.com/api/?name=' + p.name?.replace(' ', '+') + '&background=random',
+            avatar: p.avatar_url || `https://ui-avatars.com/api/?name=${p.name?.replace(' ', '+') || 'User'}&background=random`,
             email: '', 
-            status: 'offline', 
+            status: 'offline', // Default status for fetched users, as real-time status is not in DB
             lastSeen: Date.now(),
         }));
-        const updatedUsers = fetchedUsers.map(u => u.id === currentUser.id ? currentUser : u);
-        setAllUsers(updatedUsers);
       } else {
-        console.error('Error fetching users:', usersError);
-        setAllUsers([currentUser]);
+        console.error('Error fetching users from profiles table:', usersError);
       }
+
+      // Ensure currentUser is always in the list and has its actual status
+      const finalUsers = fetchedUsers.map(u => u.id === currentUser.id ? currentUser : u);
+      // If currentUser was not in fetchedUsers (e.g., profiles table was empty), add them.
+      if (!finalUsers.some(u => u.id === currentUser.id)) {
+        finalUsers.push(currentUser);
+      }
+      setAllUsers(finalUsers);
 
       // Fetch Clients
       const { data: clientsData, error: clientsError } = await supabase
