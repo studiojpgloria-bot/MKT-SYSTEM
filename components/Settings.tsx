@@ -31,7 +31,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [newStage, setNewStage] = useState('');
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
-  // Sync local state with props when they change
+  // Sincroniza o estado local com as props quando elas mudam (ex: após salvar)
   useEffect(() => {
     setLocalSettings(settings);
     setLocalWorkflow(workflow);
