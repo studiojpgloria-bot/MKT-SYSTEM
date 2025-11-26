@@ -1,6 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, Cloud, HardDrive, FileText, CheckSquare, GripVertical, Briefcase } from 'lucide-react';
-import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask, Client } from '../types';
+import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, Cloud, HardDrive, FileText, CheckSquare, GripVertical, Briefcase, Link as LinkIcon } from 'lucide-react';
+import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask, Client, Attachment } from '../types';
+
+// Helper to get a consistent color for a tag
+const getTagColor = (tag: string) => {
+    const colors = [
+        'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900',
+        'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-900',
+        'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-900',
+        'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-900',
+        'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-900',
+        'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-900',
+    ];
+    let hash = 0;
+    for (let i = 0; i < tag.length; i++) {
+        hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+};
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -15,6 +32,7 @@ interface TaskDetailModalProps {
   onDelete: (taskId: string) => void;
   onUpload: (taskId: string, file: File) => void;
   onCloudImport: (taskId: string, service: string) => void;
+  onLinkImport: (taskId: string, url: string) => void;
   onAccept: (taskId: string) => void;
   onApprove: (taskId: string, attachmentId: string) => void;
   onReject: (taskId: string, attachmentId: string) => void;
@@ -33,6 +51,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onDelete,
   onUpload,
   onCloudImport,
+  onLinkImport,
   onAccept,
   onApprove,
   onReject
@@ -43,13 +62,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [newSubtask, setNewSubtask] = useState('');
   const [addTimeAmount, setAddTimeAmount] = useState(30);
   const [showCloudMenu, setShowCloudMenu] = useState(false);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cloudMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setEditedTask(task);
-  }, [task]);
+    if (!isOpen) {
+        setShowLinkInput(false);
+        setLinkUrl('');
+    }
+  }, [task, isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -120,6 +145,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           onUpload(editedTask.id, e.target.files[0]);
+      }
+  };
+
+  const handleLinkSubmit = () => {
+      if (linkUrl.trim()) {
+          onLinkImport(editedTask.id, linkUrl.trim());
+          setLinkUrl('');
+          setShowLinkInput(false);
       }
   };
 
@@ -334,7 +367,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     className="hidden" 
                  />
                  
-                 {/* Upload allowed if NOT in review/approved OR if user is Admin/Manager */}
                  {(!isInReview && !isApproved || isAdminOrManager) && (
                      <div className="flex items-center gap-2" ref={cloudMenuRef}>
                         <div className="relative">
@@ -359,7 +391,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                              </div>
                            )}
                         </div>
-
+                        <button 
+                           onClick={() => setShowLinkInput(true)}
+                           className="text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors text-gray-600 hover:bg-gray-100 border border-gray-200"
+                        >
+                           <LinkIcon size={12} /> Link
+                        </button>
                         <button 
                            onClick={() => fileInputRef.current?.click()}
                            className={`text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors ${
@@ -374,6 +411,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                      </div>
                  )}
               </div>
+
+              {showLinkInput && (
+                <div className="flex gap-2 mb-3 p-2 border border-dashed rounded-lg">
+                    <input 
+                        type="text"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleLinkSubmit()}
+                        placeholder="Paste image or video URL here..."
+                        className="flex-1 bg-transparent text-sm focus:ring-0 border-none"
+                    />
+                    <button onClick={() => setShowLinkInput(false)} className="text-gray-400 hover:text-gray-600 p-1"><X size={14}/></button>
+                    <button onClick={handleLinkSubmit} className="bg-indigo-600 text-white text-xs font-bold px-3 rounded">Add</button>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {editedTask.attachments.map(att => (
@@ -418,7 +470,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         </div>
                         
                         <div className="flex items-center gap-2">
-                            {/* Approval Buttons only for PENDING DELIVERABLES and accessible by ADMIN/MANAGER */}
                             {att.status === 'pending' && att.category === 'deliverable' && isAdminOrManager && (
                                 <>
                                     <button 
@@ -644,9 +695,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Tags</label>
                     <div className="flex flex-wrap gap-2 mb-2">
                         {editedTask.tags.map(tag => (
-                            <span key={tag} className="bg-white border border-gray-200 text-gray-600 px-2 py-1 rounded text-xs flex items-center gap-1 group">
+                            <span key={tag} className={`font-bold px-2 py-1 rounded text-xs flex items-center gap-1.5 group border ${getTagColor(tag)}`}>
                                 {tag}
-                                <button onClick={() => removeTag(tag)} className="hover:text-red-500"><X size={10}/></button>
+                                <button onClick={() => removeTag(tag)} className="opacity-50 group-hover:opacity-100 hover:text-red-500"><X size={12}/></button>
                             </span>
                         ))}
                     </div>

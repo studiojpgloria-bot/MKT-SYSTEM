@@ -363,6 +363,23 @@ export const App: React.FC = () => {
       }, 1500);
   };
 
+  const handleLinkImport = (taskId: string, url: string) => {
+    const isImage = /\.(jpeg|jpg|gif|png|svg)$/i.test(url);
+    const isVideo = /\.(mp4|webm|ogg)$/i.test(url) || url.includes('youtube.com') || url.includes('vimeo.com');
+
+    const newAttachment: Attachment = {
+        id: `l${Date.now()}`,
+        name: url.split('/').pop() || 'Linked Media',
+        url: url,
+        type: isVideo ? 'video' : (isImage ? 'image' : 'pdf'),
+        source: 'local', // Representing it as a direct link
+        category: 'reference',
+        uploadedBy: currentUser?.id || 'system',
+        status: 'approved'
+    };
+    processAttachmentLogic(taskId, newAttachment);
+  };
+
   const processAttachmentLogic = async (taskId: string, newAttachment: Attachment) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
@@ -692,6 +709,7 @@ export const App: React.FC = () => {
         onDelete={handleDeleteTask}
         onUpload={handleUploadAttachment}
         onCloudImport={handleCloudImport}
+        onLinkImport={handleLinkImport}
         onAccept={handleAcceptTask}
         onApprove={handleApproveFile}
         onReject={handleRejectFile}

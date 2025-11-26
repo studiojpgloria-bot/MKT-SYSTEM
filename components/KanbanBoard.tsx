@@ -1,6 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreHorizontal, Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, Trash2, Check, Download, CheckSquare } from 'lucide-react';
 import { Task, TaskPriority, User, WorkflowStage, UserRole } from '../types';
+import { QuickTaskForm } from './QuickTaskForm';
+
+// Helper to get a consistent color for a tag
+const getTagColor = (tag: string) => {
+    const colors = [
+        'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900',
+        'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-900',
+        'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-900',
+        'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-900',
+        'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-900',
+        'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-900',
+    ];
+    let hash = 0;
+    for (let i = 0; i < tag.length; i++) {
+        hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+};
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -97,7 +115,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   // State for inline task creation
   const [addingToStage, setAddingToStage] = useState<string | null>(null);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -116,14 +133,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       case TaskPriority.MEDIUM: return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900';
       default: return 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700';
     }
-  };
-
-  const handleQuickCreate = (stageId: string) => {
-      if (newTaskTitle.trim()) {
-          onCreateTask(newTaskTitle, stageId);
-          setNewTaskTitle('');
-          setAddingToStage(null);
-      }
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -318,7 +327,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       {task.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-3">
                            {task.tags.slice(0, 3).map(tag => (
-                            <span key={tag} className="text-[10px] font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700">
+                            <span key={tag} className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getTagColor(tag)}`}>
                               {tag}
                             </span>
                           ))}
@@ -367,35 +376,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 {canEdit && (
                   <>
                     {addingToStage === stage.id ? (
-                       <div className="bg-white dark:bg-slate-900 p-3 rounded-lg shadow-sm border border-indigo-200 dark:border-indigo-800 animate-in fade-in zoom-in-95 duration-200">
-                          <input 
-                             autoFocus
-                             type="text"
-                             placeholder="Enter task title..."
-                             value={newTaskTitle}
-                             onChange={(e) => setNewTaskTitle(e.target.value)}
-                             onKeyDown={(e) => {
-                               if (e.key === 'Enter') handleQuickCreate(stage.id);
-                               if (e.key === 'Escape') { setAddingToStage(null); setNewTaskTitle(''); }
-                             }}
-                             className="w-full text-sm border-none p-0 focus:ring-0 mb-2 font-medium text-gray-800 dark:text-white placeholder-gray-400 bg-transparent"
-                          />
-                          <div className="flex justify-end gap-2">
-                             <button 
-                                onClick={() => { setAddingToStage(null); setNewTaskTitle(''); }}
-                                className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-400"
-                             >
-                                <X size={16} />
-                             </button>
-                             <button 
-                                onClick={() => handleQuickCreate(stage.id)}
-                                disabled={!newTaskTitle.trim()}
-                                className={`p-1 rounded text-white ${newTaskTitle.trim() ? `bg-${themeColor}-600 hover:bg-${themeColor}-700` : 'bg-gray-300 dark:bg-slate-700'}`}
-                             >
-                                <Check size={16} />
-                             </button>
-                          </div>
-                       </div>
+                       <QuickTaskForm 
+                          stageId={stage.id}
+                          themeColor={themeColor}
+                          onCreateTask={onCreateTask}
+                          onCancel={() => setAddingToStage(null)}
+                       />
                     ) : (
                       <button 
                         onClick={() => setAddingToStage(stage.id)}
