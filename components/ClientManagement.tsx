@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Client } from '../types';
-import { Plus, MoreVertical, Edit, Trash2, X, Building, Search, Mail, User } from 'lucide-react';
+import { Plus, Edit, X, Building, Search, Mail, User } from 'lucide-react';
 
 type ClientFormData = Omit<Client, 'id' | 'creator_id'>;
 
@@ -62,7 +62,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ clients, onA
   );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-10">
+    <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Client Management</h1>
@@ -142,7 +142,7 @@ export const ClientManagement: React.FC<ClientManagementProps> = ({ clients, onA
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Client Name</label>
                   <input type="text" name="name" value={formData.name} onChange={handleFormChange} required className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Contact Person</label>
                         <input type="text" name="contact_person" value={formData.contact_person} onChange={handleFormChange} className="w-full p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500" />
