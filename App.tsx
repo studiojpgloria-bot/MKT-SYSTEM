@@ -368,6 +368,29 @@ export const App: React.FC = () => {
     processAttachmentLogic(taskId, newAttachment);
   };
 
+  const handleCloudImport = (taskId: string, service: string) => {
+      addNotification('Connecting to Cloud', `Fetching files from ${service.replace('_', ' ')}...`, 'info');
+      
+      const isManagerOrAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MANAGER;
+      const category = isManagerOrAdmin ? 'reference' : 'deliverable';
+      const status = isManagerOrAdmin ? 'approved' : 'pending';
+
+      setTimeout(() => {
+          const newAttachment: Attachment = {
+            id: `c${Date.now()}`,
+            name: `Project_Brief_${service}.pdf`,
+            url: '#', // Mock URL
+            type: 'pdf',
+            source: service as any,
+            category: category,
+            uploadedBy: currentUser?.id || 'system',
+            status: status
+          };
+          
+          processAttachmentLogic(taskId, newAttachment);
+      }, 1500);
+  };
+
   const handleLinkImport = (taskId: string, url: string) => {
     const isImage = /\.(jpeg|jpg|gif|png|svg)$/i.test(url);
     const isVideo = /\.(mp4|webm|ogg)$/i.test(url) || url.includes('youtube.com') || url.includes('vimeo.com');
@@ -722,6 +745,7 @@ export const App: React.FC = () => {
         onAddComment={handleAddComment}
         onDelete={handleDeleteTask}
         onUpload={handleUploadAttachment}
+        onCloudImport={handleCloudImport}
         onLinkImport={handleLinkImport}
         onAccept={handleAcceptTask}
         onApprove={handleApproveFile}

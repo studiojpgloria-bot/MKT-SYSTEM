@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { Task, CalendarEvent, Notification, User, WorkflowStage, SystemSettings, UserRole, Client } from '../types';
 import { useSupabaseAuth } from './useSupabaseAuth';
@@ -27,7 +27,6 @@ export const useSupabaseData = (): SupabaseData => {
   const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
   const [dataLoading, setDataLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
-  const isInitialLoad = useRef(true);
 
   const refetchData = () => setRefreshKey(prev => prev + 1);
 
@@ -43,11 +42,7 @@ export const useSupabaseData = (): SupabaseData => {
     }
 
     const fetchAllData = async () => {
-      // Only show the full-page loader on the very first data fetch.
-      // Subsequent refetches will happen in the background.
-      if (isInitialLoad.current) {
-        setDataLoading(true);
-      }
+      setDataLoading(true);
 
       // Fetch App Settings & Workflow
       const { data: settingsData, error: settingsError } = await supabase
@@ -146,7 +141,6 @@ export const useSupabaseData = (): SupabaseData => {
       }
 
       setDataLoading(false);
-      isInitialLoad.current = false;
     };
 
     fetchAllData();
