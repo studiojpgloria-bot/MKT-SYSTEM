@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, Cloud, HardDrive, FileText, CheckSquare, GripVertical } from 'lucide-react';
-import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask } from '../types';
+import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, Cloud, HardDrive, FileText, CheckSquare, GripVertical, Briefcase } from 'lucide-react';
+import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask, Client } from '../types';
 
 interface TaskDetailModalProps {
   task: Task | null;
   currentUser: User;
   users: User[];
+  clients: Client[];
   workflow: WorkflowStage[]; 
   isOpen: boolean;
   onClose: () => void;
@@ -24,6 +24,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   task, 
   currentUser,
   users, 
+  clients,
   workflow,
   isOpen, 
   onClose, 
@@ -135,6 +136,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   };
 
   const assignee = users.find(u => u.id === editedTask.assigneeId);
+  const client = clients.find(c => c.id === editedTask.clientId);
   const isAssignee = currentUser.id === editedTask.assigneeId;
   const isAdminOrManager = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER;
 
@@ -607,13 +609,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                 <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Client</label>
-                    <input 
-                        type="text"
-                        readOnly={!isAdminOrManager}
-                        value={editedTask.client}
-                        onChange={(e) => handleSaveField('client', e.target.value)}
-                        className="w-full p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    />
+                    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+                        <Briefcase size={16} className="text-gray-400 ml-1" />
+                        <select 
+                            value={editedTask.clientId || ''}
+                            disabled={!isAdminOrManager}
+                            onChange={(e) => handleSaveField('clientId', e.target.value || null)}
+                            className="flex-1 bg-transparent text-sm text-gray-700 border-none focus:ring-0 cursor-pointer p-0 disabled:cursor-not-allowed"
+                        >
+                            <option value="">No Client</option>
+                            {clients.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div>

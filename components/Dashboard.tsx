@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { TrendingUp, CheckCircle, AlertCircle, Clock, Timer, User as UserIcon, Coffee, Wifi, Activity, ChevronRight, PlayCircle } from 'lucide-react';
@@ -198,7 +197,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                             >
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="text-[10px] font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded uppercase tracking-wide">
-                                        {task.client}
+                                        {task.clients?.name || 'No Client'}
                                     </span>
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${
                                         task.priority === 'URGENT' ? 'bg-red-50 text-red-600' : 

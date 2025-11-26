@@ -57,6 +57,12 @@ export interface User {
   lastSeen: number;
 }
 
+export interface Client {
+  id: string;
+  name: string;
+  logo_url?: string;
+}
+
 export interface Comment {
   id: string;
   userId: string;
@@ -97,16 +103,18 @@ export interface Task {
   description: string;
   stage: string; // Changed from Enum to string to support dynamic stages
   priority: TaskPriority;
+  creator_id: string;
   assigneeId: string;
+  clientId: string | null;
   dueDate: number;
   createdAt: number;
-  client: string;
   tags: string[];
   subtasks: Subtask[];
   attachments: Attachment[];
   comments: Comment[];
   timeSpent: number; // in minutes
   accepted: boolean;
+  clients?: Client; // For joined data
 }
 
 export interface CalendarEvent {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../integrations/supabase/client';
-import { Task, CalendarEvent, Notification, User, WorkflowStage, SystemSettings, UserRole } from '../types';
+import { Task, CalendarEvent, Notification, User, WorkflowStage, SystemSettings, UserRole, Client } from '../types';
 import { useSupabaseAuth } from './useSupabaseAuth';
 import { INITIAL_WORKFLOW, INITIAL_SETTINGS } from '../constants';
 
@@ -8,6 +8,7 @@ interface SupabaseData {
   tasks: Task[];
   events: CalendarEvent[];
   allUsers: User[];
+  clients: Client[];
   notifications: Notification[];
   workflow: WorkflowStage[];
   settings: SystemSettings;
@@ -20,6 +21,7 @@ export const useSupabaseData = (): SupabaseData => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [workflow, setWorkflow] = useState<WorkflowStage[]>(INITIAL_WORKFLOW);
   const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
@@ -75,6 +77,7 @@ export const useSupabaseData = (): SupabaseData => {
       setTasks([]);
       setEvents([]);
       setAllUsers([]);
+      setClients([]);
       setNotifications([]);
       setDataLoading(false);
       return;
@@ -83,14 +86,13 @@ export const useSupabaseData = (): SupabaseData => {
     const fetchAllData = async () => {
       setDataLoading(true);
 
-      // 1. Fetch All Users (Profiles)
+      // Fetch All Users (Profiles)
       const { data: usersData, error: usersError } = await supabase
         .from('profiles')
         .select('id, name, role, avatar_url');
       
-      let fetchedUsers: User[] = [];
       if (usersData && !usersError) {
-        fetchedUsers = usersData.map(p => ({
+        const fetchedUsers: User[] = usersData.map(p => ({
             id: p.id,
             name: p.name || 'Unknown User',
             role: p.role as UserRole,
@@ -99,8 +101,6 @@ export const useSupabaseData = (): SupabaseData => {
             status: 'offline', 
             lastSeen: Date.now(),
         }));
-        
-        // Ensure the current user's full object is prioritized
         const updatedUsers = fetchedUsers.map(u => u.id === currentUser.id ? currentUser : u);
         setAllUsers(updatedUsers);
       } else {
@@ -108,10 +108,22 @@ export const useSupabaseData = (): SupabaseData => {
         setAllUsers([currentUser]);
       }
 
-      // 2. Fetch Tasks (RLS handles filtering by user/creator/assignee)
+      // Fetch Clients
+      const { data: clientsData, error: clientsError } = await supabase
+        .from('clients')
+        .select('*');
+      
+      if (clientsData && !clientsError) {
+        setClients(clientsData as Client[]);
+      } else {
+        console.error('Error fetching clients:', clientsError);
+        setClients([]);
+      }
+
+      // Fetch Tasks with Client data joined
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
-        .select('*')
+        .select('*, clients(id, name, logo_url)')
         .order('created_at', { ascending: false });
 
       if (tasksData && !tasksError) {
@@ -121,7 +133,7 @@ export const useSupabaseData = (): SupabaseData => {
         setTasks([]);
       }
 
-      // 3. Fetch Calendar Events (RLS handles filtering)
+      // Fetch Calendar Events
       const { data: eventsData, error: eventsError } = await supabase
         .from('calendar_events')
         .select('*');
@@ -133,7 +145,7 @@ export const useSupabaseData = (): SupabaseData => {
         setEvents([]);
       }
 
-      // 4. Fetch Notifications (RLS handles filtering by user_id)
+      // Fetch Notifications
       const { data: notifData, error: notifError } = await supabase
         .from('notifications')
         .select('*')
@@ -150,16 +162,17 @@ export const useSupabaseData = (): SupabaseData => {
     };
 
     fetchAllData();
-  }, [isAuthenticated, currentUser?.id, refreshKey, initialLoadComplete]); // Added initialLoadComplete dependency
+  }, [isAuthenticated, currentUser?.id, refreshKey, initialLoadComplete]);
 
   return {
     tasks,
     events,
     allUsers,
+    clients,
     notifications,
     workflow,
     settings,
-    dataLoading: dataLoading || !initialLoadComplete, // Wait for local settings AND remote data
+    dataLoading: dataLoading || !initialLoadComplete,
     refetchData,
   };
 };

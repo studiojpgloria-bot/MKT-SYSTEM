@@ -11,7 +11,7 @@ import { Settings } from './components/Settings';
 import { Reports } from './components/Reports'; 
 import { ProfilePage } from './components/ProfilePage';
 import { INITIAL_SETTINGS, INITIAL_WORKFLOW } from './constants';
-import { Task, User, UserRole, TaskPriority, Attachment, Notification, SystemSettings, WorkflowStage, CalendarEvent } from './types';
+import { Task, User, UserRole, TaskPriority, Attachment, Notification, SystemSettings, WorkflowStage, CalendarEvent, Client } from './types';
 import { useSupabaseAuth } from './hooks/useSupabaseAuth';
 import { useSupabaseData } from './hooks/useSupabaseData';
 import { supabase } from './integrations/supabase/client';
@@ -34,6 +34,7 @@ export const App: React.FC = () => {
     tasks, 
     events, 
     allUsers: users, 
+    clients,
     notifications, 
     workflow, 
     settings, 
@@ -65,7 +66,7 @@ export const App: React.FC = () => {
   // Helper: Add Notification (Both Toast and History)
   const addNotification = async (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
       const id = Date.now().toString();
-      const newNotif: Notification = { id, title, message, type, read: false, timestamp: Date.now(), user_id: currentUser?.id || 'system' };
+      const newNotif: Notification = { id, title, message, type, read: false, timestamp: Date.now() };
       
       // Add to toast queue
       setToasts(prev => [...prev, newNotif]);
@@ -256,7 +257,7 @@ export const App: React.FC = () => {
       const row = [
           task.id,
           `"${task.title.replace(/"/g, '""')}"`,
-          `"${task.client}"`,
+          `"${task.clients?.name || ''}"`,
           task.stage,
           task.priority,
           new Date(task.dueDate).toLocaleDateString(),
@@ -427,7 +428,7 @@ export const App: React.FC = () => {
           assignee_id: currentUser.id,
           creator_id: currentUser.id,
           due_date: new Date(Date.now() + 86400000).toISOString(),
-          client: 'New Client',
+          client_id: null,
           tags: [],
           subtasks: [],
           attachments: [],
@@ -464,7 +465,7 @@ export const App: React.FC = () => {
           assignee_id: currentUser.id,
           creator_id: currentUser.id,
           due_date: new Date(Date.now() + 86400000).toISOString(),
-          client: 'New Client',
+          client_id: null,
           tags: [],
           subtasks: [],
           attachments: [],
@@ -650,6 +651,7 @@ export const App: React.FC = () => {
         onClose={() => setIsTaskModalOpen(false)}
         task={selectedTask}
         users={users}
+        clients={clients}
         workflow={workflow}
         onUpdate={handleTaskUpdate}
         onAddComment={handleAddComment}

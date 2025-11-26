@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { MoreHorizontal, Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, Trash2, Check, Download, CheckSquare } from 'lucide-react';
 import { Task, TaskPriority, User, WorkflowStage, UserRole } from '../types';
@@ -129,7 +128,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const filteredTasks = tasks.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            task.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (task.clients?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                             task.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
                             task.id.toLowerCase().includes(searchQuery.toLowerCase());
       
@@ -311,8 +310,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       <h4 className="font-semibold text-gray-800 dark:text-white mb-1 leading-tight">
                           {task.title}
                       </h4>
-                      <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-2 mb-4">
-                          {task.description}
+                      <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-3">
+                          {task.clients?.name || 'No Client'}
                       </p>
 
                       {/* Tags */}
