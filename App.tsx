@@ -11,7 +11,7 @@ import { Settings } from './components/Settings';
 import { Reports } from './components/Reports'; 
 import { ProfilePage } from './components/ProfilePage';
 import { LoadingSpinner } from './components/LoadingSpinner';
-import { MOCK_USERS, INITIAL_TASKS, INITIAL_EVENTS, INITIAL_SETTINGS } from './constants';
+import { MOCK_USERS, INITIAL_SETTINGS } from './constants';
 import { Task, User, UserRole, Notification, SystemSettings, WorkflowStage, CalendarEvent } from './types';
 import { supabase } from './integrations/supabase/client';
 
