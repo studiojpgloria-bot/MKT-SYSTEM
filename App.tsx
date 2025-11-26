@@ -10,50 +10,40 @@ import { NotificationToast } from './components/NotificationToast';
 import { Settings } from './components/Settings';
 import { Reports } from './components/Reports'; 
 import { ProfilePage } from './components/ProfilePage';
-import { MOCK_USERS, INITIAL_TASKS, INITIAL_EVENTS, INITIAL_SETTINGS } from './constants';
-import { Task, User, UserRole, TaskPriority, Attachment, Notification, SystemSettings, WorkflowStage, CalendarEvent } from './types';
+import { ClientManagement } from './components/ClientManagement';
+import { INITIAL_SETTINGS, INITIAL_WORKFLOW } from './constants';
+import { Task, User, UserRole, TaskPriority, Attachment, Notification, SystemSettings, WorkflowStage, CalendarEvent, Client } from './types';
+import { useSupabaseAuth } from './hooks/useSupabaseAuth';
+import { useSupabaseData } from './hooks/useSupabaseData';
+import { supabase } from './integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 
-// Initial Workflow
-const INITIAL_WORKFLOW: WorkflowStage[] = [
-  { id: 'briefing', name: 'Briefing', color: 'indigo' },
-  { id: 'design', name: 'Design', color: 'indigo' },
-  { id: 'review', name: 'Review', color: 'indigo' },
-  { id: 'approved', name: 'Approved', color: 'indigo' },
-  { id: 'published', name: 'Published', color: 'indigo' }
-];
+// Helper function to convert a file to a base64 string
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 export const App: React.FC = () => {
-  // State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUserIndex, setCurrentUserIndex] = useState(0);
+  const { currentUser, isAuthenticated, isLoading: isAuthLoading } = useSupabaseAuth();
+  const { 
+    tasks, 
+    events, 
+    allUsers: users, 
+    clients,
+    notifications, 
+    workflow, 
+    settings, 
+    dataLoading, 
+    refetchData 
+  } = useSupabaseData();
+
   const [currentView, setCurrentView] = useState('dashboard');
-  
-  // Load from LocalStorage or use Initial
-  const [tasks, setTasks] = useState<Task[]>(() => {
-      const saved = localStorage.getItem('nexus_tasks');
-      return saved ? JSON.parse(saved) : INITIAL_TASKS;
-  });
-  const [events, setEvents] = useState<CalendarEvent[]>(() => {
-      const saved = localStorage.getItem('nexus_events');
-      return saved ? JSON.parse(saved) : INITIAL_EVENTS;
-  });
-  const [users, setUsers] = useState<User[]>(() => {
-      const saved = localStorage.getItem('nexus_users');
-      return saved ? JSON.parse(saved) : MOCK_USERS;
-  });
-  const [workflow, setWorkflow] = useState<WorkflowStage[]>(() => {
-      const saved = localStorage.getItem('nexus_workflow');
-      return saved ? JSON.parse(saved) : INITIAL_WORKFLOW;
-  });
-  const [notifications, setNotifications] = useState<Notification[]>(() => {
-      const saved = localStorage.getItem('nexus_notifications');
-      return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [settings, setSettings] = useState<SystemSettings>(() => {
-      const savedTheme = localStorage.getItem('nexus_settings');
-      return savedTheme ? JSON.parse(savedTheme) : INITIAL_SETTINGS;
-  });
   
   // Modal State
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -61,95 +51,92 @@ export const App: React.FC = () => {
 
   // Transient Toasts (Not persisted)
   const [toasts, setToasts] = useState<Notification[]>([]);
+  
+  // State to prevent multiple welcome notifications
+  const [welcomeNotificationShown, setWelcomeNotificationShown] = useState(false);
 
-  // Apply Dark Mode Effect
+  // Enforce Light Mode
   useEffect(() => {
-    if (settings.darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('nexus_darkMode', JSON.stringify(settings.darkMode));
-  }, [settings.darkMode]);
-
-  // Persistence Effects
-  useEffect(() => { localStorage.setItem('nexus_tasks', JSON.stringify(tasks)); }, [tasks]);
-  useEffect(() => { localStorage.setItem('nexus_events', JSON.stringify(events)); }, [events]);
-  useEffect(() => { localStorage.setItem('nexus_users', JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem('nexus_workflow', JSON.stringify(workflow)); }, [workflow]);
-  useEffect(() => { localStorage.setItem('nexus_notifications', JSON.stringify(notifications)); }, [notifications]);
-  useEffect(() => { localStorage.setItem('nexus_settings', JSON.stringify(settings)); }, [settings]);
+    document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('light');
+  }, []);
 
   // Derived State
-  const currentUser = users[currentUserIndex % users.length];
   const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
 
   // Helper: Add Notification (Both Toast and History)
-  const addNotification = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+  const addNotification = async (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
       const id = Date.now().toString();
       const newNotif: Notification = { id, title, message, type, read: false, timestamp: Date.now() };
-      
-      // Add to history
-      setNotifications(prev => [newNotif, ...prev]);
       
       // Add to toast queue
       setToasts(prev => [...prev, newNotif]);
       setTimeout(() => {
           setToasts(prev => prev.filter(n => n.id !== id));
       }, 5000);
+
+      // Persist notification (if user is logged in)
+      if (currentUser) {
+          const { error } = await supabase.from('notifications').insert({
+              user_id: currentUser.id,
+              title,
+              message,
+              type,
+              read: false,
+          });
+          if (error) console.error('Error saving notification:', error);
+          refetchData(); // Refresh notification list
+      }
   };
 
   const removeToast = (id: string) => {
       setToasts(prev => prev.filter(n => n.id !== id));
   };
 
-  const markNotificationRead = (id: string) => {
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  const markNotificationRead = async (id: string) => {
+      const { error } = await supabase.from('notifications').update({ read: true }).eq('id', id);
+      if (error) console.error('Error marking notification read:', error);
+      refetchData();
   };
   
-  const clearNotifications = () => {
-      setNotifications([]);
+  const clearNotifications = async () => {
+      // Note: RLS should ensure users can only delete their own notifications
+      const { error } = await supabase.from('notifications').delete().eq('user_id', currentUser?.id);
+      if (error) console.error('Error clearing notifications:', error);
+      refetchData();
   };
 
-  // Reset Logic
+  // Reset Logic (Only resets local settings/workflow, not Supabase data)
   const handleResetApp = () => {
       localStorage.clear();
-      setTasks(INITIAL_TASKS);
-      setEvents(INITIAL_EVENTS);
-      setUsers(MOCK_USERS);
-      setWorkflow(INITIAL_WORKFLOW);
-      setNotifications([]);
-      setSettings(INITIAL_SETTINGS);
-      addNotification('System Reset', 'All data has been restored to defaults.', 'info');
+      
+      addNotification('System Reset', 'Local settings have been restored to defaults.', 'info');
+      refetchData();
   };
 
   // Auth Handlers
-  const handleLogin = (user: User) => {
-      const index = users.findIndex(u => u.id === user.id);
-      if (index !== -1) {
-          setCurrentUserIndex(index);
-          setIsAuthenticated(true);
-          addNotification('Welcome Back', `Signed in as ${user.name}`, 'success');
-          
-          // Set status to online on login
-          const updatedUsers = users.map(u => u.id === user.id ? { ...u, status: 'online' as const, lastSeen: Date.now() } : u);
-          setUsers(updatedUsers);
+  useEffect(() => {
+      if (isAuthenticated && currentUser && !welcomeNotificationShown) {
+          addNotification('Welcome Back', `Signed in as ${currentUser.name}`, 'success');
+          setWelcomeNotificationShown(true);
+      } else if (!isAuthenticated) {
+          setWelcomeNotificationShown(false); // Reset on logout
       }
-  };
+  }, [isAuthenticated, currentUser, welcomeNotificationShown]);
 
-  const handleLogout = () => {
-      // Set status to offline on logout
-      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, status: 'offline' as const, lastSeen: Date.now() } : u);
-      setUsers(updatedUsers);
+  const handleLogout = async () => {
+      // Set status to offline (local state only for now)
       
-      setIsAuthenticated(false);
-      setCurrentView('dashboard');
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+          console.error('Error signing out:', error);
+          addNotification('Logout Failed', 'Could not sign out.', 'error');
+      }
+      // SupabaseProvider handles setting isAuthenticated=false and clearing currentUser
   };
 
   const handleUpdateUserStatus = (status: 'online' | 'paused' | 'offline') => {
-      const updatedUsers = users.map(u => u.id === currentUser.id ? { ...u, status, lastSeen: Date.now() } : u);
-      setUsers(updatedUsers);
-      
+      // Status updates are currently local state only.
       if (status === 'paused') {
           addNotification('Status Updated', 'You are now paused for 15 minutes.', 'warning');
       } else if (status === 'online') {
@@ -157,46 +144,187 @@ export const App: React.FC = () => {
       }
   };
 
-  const handleUpdateUser = (userId: string, updates: Partial<User>) => {
-    setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...updates } : u));
-    addNotification('Profile Updated', 'Your changes have been saved.', 'success');
+  const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
+    const supabaseUpdates: any = { updated_at: new Date().toISOString() };
+    if (updates.name) supabaseUpdates.name = updates.name;
+    if (updates.avatar) supabaseUpdates.avatar_url = updates.avatar;
+    if (updates.role) supabaseUpdates.role = updates.role;
+
+    const { error } = await supabase
+        .from('profiles')
+        .update(supabaseUpdates)
+        .eq('id', userId);
+
+    if (error) {
+        console.error('Error updating profile:', error);
+        addNotification('Falha na Atualização', 'Não foi possível salvar as alterações no perfil.', 'error');
+    } else {
+        addNotification('Perfil Atualizado', 'Suas alterações foram salvas com sucesso.', 'success');
+        refetchData();
+    }
   };
 
-  const handleTaskUpdate = (taskId: string, updates: Partial<Task>) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+  const handleUpdateUserRole = async (userId: string, role: UserRole) => {
+    if (currentUser?.role !== UserRole.ADMIN) {
+        addNotification('Permission Denied', 'Only admins can change user roles.', 'error');
+        return;
+    }
+    const { error } = await supabase
+        .from('profiles')
+        .update({ role })
+        .eq('id', userId);
+
+    if (error) {
+        addNotification('Update Failed', `Could not update role for user.`, 'error');
+        console.error(error);
+    } else {
+        addNotification('Role Updated', 'User role has been successfully changed.', 'success');
+        refetchData();
+    }
   };
 
-  const handleAcceptTask = (taskId: string) => {
-    setTasks(prev => prev.map(t => {
-        if (t.id !== taskId) return t;
-        return {
-            ...t,
-            stage: 'design', 
-            accepted: true
-        };
-    }));
+  const handleInviteNewMember = async (email: string, password: string, name: string) => {
+    if (currentUser?.role !== UserRole.ADMIN) {
+        addNotification('Permission Denied', 'Only admins can invite new members.', 'error');
+        return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+            data: {
+                name: name, // Pass name to user_metadata for the trigger
+            },
+        },
+    });
+
+    if (error) {
+        addNotification('Invite Failed', `Could not invite member: ${error.message}`, 'error');
+        console.error('Error inviting new member:', error);
+    } else if (data.user) {
+        addNotification('Member Invited', `An invitation email has been sent to ${email}.`, 'success');
+        refetchData(); // Refresh user list to show new member once confirmed
+    } else {
+        addNotification('Invite Sent', `An invitation email has been sent to ${email}.`, 'info');
+        refetchData();
+    }
+  };
+
+  const handleSaveSettings = async (newSettings: SystemSettings, newWorkflow: WorkflowStage[]) => {
+    if (currentUser?.role !== UserRole.ADMIN) {
+        addNotification('Permission Denied', 'Only admins can change system settings.', 'error');
+        return;
+    }
+    const { error } = await supabase
+        .from('app_settings')
+        .update({ system_settings: newSettings, workflow: newWorkflow })
+        .eq('id', 1);
+
+    if (error) {
+        addNotification('Save Failed', 'Could not save settings to the database.', 'error');
+        console.error(error);
+    } else {
+        addNotification('Settings Saved', 'System settings have been updated.', 'success');
+        refetchData();
+    }
+  };
+
+  const handleUpdateAvatar = async (userId: string, file: File) => {
+    if (!currentUser) return;
+
+    addNotification('Processando...', 'Redimensionando sua imagem...', 'info');
+
+    const options = {
+      maxSizeMB: 1,
+      maxWidthOrHeight: 1000,
+      useWebWorker: true,
+    };
+
+    try {
+      const compressedFile = await imageCompression(file, options);
+      const base64File = await fileToBase64(compressedFile);
+
+      addNotification('Enviando...', 'Sua nova foto de perfil está sendo enviada.', 'info');
+      
+      // Invoke the edge function
+      const { data, error } = await supabase.functions.invoke('upload-avatar', {
+        body: { file: base64File, fileType: compressedFile.type },
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data.publicUrl) {
+        throw new Error('A URL do avatar não foi retornada pela função.');
+      }
+      
+      // Add cache-busting query param
+      const finalUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
+
+      // Update the user's profile with the new URL
+      await handleUpdateUser(userId, { avatar: finalUrl });
+
+    } catch (error: any) {
+      console.error('Falha ao atualizar avatar:', error);
+      addNotification('Falha no Upload', error.message || 'Não foi possível salvar sua nova foto.', 'error');
+    }
+  };
+
+  const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    // Map camelCase keys to snake_case for Supabase if necessary (e.g., dueDate -> due_date)
+    const supabaseUpdates: any = {};
+    for (const key in updates) {
+        const snakeCaseKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
+        supabaseUpdates[snakeCaseKey] = (updates as any)[key];
+    }
+
+    const { error } = await supabase
+        .from('tasks')
+        .update(supabaseUpdates)
+        .eq('id', taskId);
+    
+    if (error) console.error('Error updating task:', error);
+    refetchData();
+  };
+
+  const handleAcceptTask = async (taskId: string) => {
+    const { error } = await supabase
+        .from('tasks')
+        .update({ stage: 'design', accepted: true })
+        .eq('id', taskId);
+    
+    if (error) console.error('Error accepting task:', error);
     addNotification('Task Accepted', 'Task moved to Design stage.', 'success');
+    refetchData();
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    setTasks(prev => prev.filter(t => t.id !== taskId));
+  const handleDeleteTask = async (taskId: string) => {
+    const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
+    
+    if (error) console.error('Error deleting task:', error);
     if (selectedTaskId === taskId) {
         setIsTaskModalOpen(false);
         setSelectedTaskId(null);
     }
     addNotification('Task Deleted', 'The task has been permanently removed.', 'warning');
+    refetchData();
   };
   
   const handleExportTask = (taskId: string) => {
+      // Export logic remains local as it's a client-side operation
       const task = tasks.find(t => t.id === taskId);
       if (!task) return;
 
-      // Create CSV Content
       const headers = ['ID', 'Title', 'Client', 'Status', 'Priority', 'Due Date', 'Assignee'];
       const row = [
           task.id,
-          `"${task.title.replace(/"/g, '""')}"`, // Escape quotes
-          `"${task.client}"`,
+          `"${task.title.replace(/"/g, '""')}"`,
+          `"${task.clients?.name || ''}"`,
           task.stage,
           task.priority,
           new Date(task.dueDate).toLocaleDateString(),
@@ -208,7 +336,7 @@ export const App: React.FC = () => {
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
       link.setAttribute("download", `task_${task.id}.csv`);
-      document.body.appendChild(link); // Required for FF
+      document.body.appendChild(link);
       
       link.click();
       document.body.removeChild(link);
@@ -217,12 +345,12 @@ export const App: React.FC = () => {
   };
 
   const handleUploadAttachment = (taskId: string, file: File) => {
+    // Attachment logic remains mock for now, updating the task's attachments JSONB column.
     const mockUrl = URL.createObjectURL(file);
     const type = file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'pdf';
     
-    const isManagerOrAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER;
+    const isManagerOrAdmin = currentUser?.role === UserRole.ADMIN || currentUser?.role === UserRole.MANAGER;
     
-    // Admin uploads are references (approved by default), Members are deliverables (pending)
     const category = isManagerOrAdmin ? 'reference' : 'deliverable';
     const status = isManagerOrAdmin ? 'approved' : 'pending';
 
@@ -233,95 +361,116 @@ export const App: React.FC = () => {
         type: type as any,
         source: 'local',
         category: category,
-        uploadedBy: currentUser.id,
+        uploadedBy: currentUser?.id || 'system',
         status: status
     };
 
     processAttachmentLogic(taskId, newAttachment);
   };
 
-  const handleCloudImport = (taskId: string, service: string) => {
-      // Simulate async cloud fetch
-      addNotification('Connecting to Cloud', `Fetching files from ${service.replace('_', ' ')}...`, 'info');
-      
-      const isManagerOrAdmin = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER;
-      const category = isManagerOrAdmin ? 'reference' : 'deliverable';
-      const status = isManagerOrAdmin ? 'approved' : 'pending';
+  const handleLinkImport = (taskId: string, url: string) => {
+    const isImage = /\.(jpeg|jpg|gif|png|svg)$/i.test(url);
+    const isVideo = /\.(mp4|webm|ogg)$/i.test(url) || url.includes('youtube.com') || url.includes('vimeo.com');
 
-      setTimeout(() => {
-          const newAttachment: Attachment = {
-            id: `c${Date.now()}`,
-            name: `Project_Brief_${service}.pdf`,
-            url: '#', // Mock URL
-            type: 'pdf',
-            source: service as any,
-            category: category,
-            uploadedBy: currentUser.id,
-            status: status
-          };
-          
-          processAttachmentLogic(taskId, newAttachment);
-      }, 1500);
+    const newAttachment: Attachment = {
+        id: `l${Date.now()}`,
+        name: url.split('/').pop() || 'Linked Media',
+        url: url,
+        type: isVideo ? 'video' : (isImage ? 'image' : 'pdf'),
+        source: 'local', // Representing it as a direct link
+        category: 'reference',
+        uploadedBy: currentUser?.id || 'system',
+        status: 'approved'
+    };
+    processAttachmentLogic(taskId, newAttachment);
   };
 
-  const processAttachmentLogic = (taskId: string, newAttachment: Attachment) => {
-    setTasks(prev => prev.map(t => {
-        if(t.id !== taskId) return t;
-        
-        // WORKFLOW RULE: If Member uploads a DELIVERABLE in Design stage, move to Review
-        let newStage = t.stage;
-        if (t.stage === 'design' && newAttachment.category === 'deliverable') {
-            newStage = 'review';
-            addNotification('Submitted for Review', 'Deliverable attached and task sent for approval.', 'success');
-        } else if (newAttachment.category === 'reference') {
-             addNotification('Reference Added', 'Reference file added to task.', 'success');
-        } else {
-            addNotification('Attachment Added', 'File added to task.', 'success');
-        }
+  const processAttachmentLogic = async (taskId: string, newAttachment: Attachment) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
 
-        return { 
-            ...t, 
+    let newStage = task.stage;
+    if (task.stage === 'design' && newAttachment.category === 'deliverable') {
+        newStage = 'review';
+        addNotification('Submitted for Review', 'Deliverable attached and task sent for approval.', 'success');
+    } else if (newAttachment.category === 'reference') {
+         addNotification('Reference Added', 'Reference file added to task.', 'success');
+    } else {
+        addNotification('Attachment Added', 'File added to task.', 'success');
+    }
+
+    const updatedAttachments = [...task.attachments, newAttachment];
+
+    const { error } = await supabase
+        .from('tasks')
+        .update({ 
             stage: newStage,
-            attachments: [...t.attachments, newAttachment] 
-        };
-    }));
+            attachments: updatedAttachments
+        })
+        .eq('id', taskId);
+    
+    if (error) console.error('Error updating task with attachment:', error);
+    refetchData();
   };
 
-  const handleAddComment = (taskId: string, text: string) => {
+  const handleAddComment = async (taskId: string, text: string) => {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task || !currentUser) return;
+
       const newComment = {
           id: Date.now().toString(),
           userId: currentUser.id,
           text,
           timestamp: Date.now()
       };
-      setTasks(prev => prev.map(t => {
-          if (t.id !== taskId) return t;
-          return { ...t, comments: [...t.comments, newComment] };
-      }));
+      
+      const updatedComments = [...task.comments, newComment];
+
+      const { error } = await supabase
+          .from('tasks')
+          .update({ comments: updatedComments })
+          .eq('id', taskId);
+      
+      if (error) console.error('Error adding comment:', error);
+      refetchData();
   };
 
-  const handleApproveFile = (taskId: string, attachmentId: string) => {
-    setTasks(prev => prev.map(t => {
-        if(t.id !== taskId) return t;
-        return {
-            ...t,
+  const handleApproveFile = async (taskId: string, attachmentId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const updatedAttachments = task.attachments.map(a => a.id === attachmentId ? {...a, status: 'approved'} : a);
+
+    const { error } = await supabase
+        .from('tasks')
+        .update({ 
             stage: 'approved',
-            attachments: t.attachments.map(a => a.id === attachmentId ? {...a, status: 'approved'} : a)
-        };
-    }));
+            attachments: updatedAttachments
+        })
+        .eq('id', taskId);
+    
+    if (error) console.error('Error approving file:', error);
     addNotification('Asset Approved', 'Task moved to Approved stage.', 'success');
+    refetchData();
   };
 
-  const handleRejectFile = (taskId: string, attachmentId: string, feedback?: string) => {
-    setTasks(prev => prev.map(t => {
-        if(t.id !== taskId) return t;
-        return {
-            ...t,
+  const handleRejectFile = async (taskId: string, attachmentId: string, feedback?: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const updatedAttachments = task.attachments.map(a => a.id === attachmentId ? {...a, status: 'rejected', feedback: feedback || a.feedback} : a);
+
+    const { error } = await supabase
+        .from('tasks')
+        .update({ 
             stage: 'design', // Move back to Design/Changes column
-            attachments: t.attachments.map(a => a.id === attachmentId ? {...a, status: 'rejected', feedback: feedback || a.feedback} : a)
-        };
-    }));
+            attachments: updatedAttachments
+        })
+        .eq('id', taskId);
+    
+    if (error) console.error('Error rejecting file:', error);
     addNotification('Revisão Solicitada', 'A tarefa retornou para o estágio de Design.', 'warning');
+    refetchData();
   };
 
   const handleOpenTask = (taskId: string) => {
@@ -329,77 +478,161 @@ export const App: React.FC = () => {
       setIsTaskModalOpen(true);
   };
 
-  const handleNewTask = () => {
-      const newTask: Task = {
-          id: `t${Date.now()}`,
+  const handleNewTask = async () => {
+      if (!currentUser) return;
+      
+      const newTask = {
           title: 'New Task',
           description: '',
           stage: 'briefing',
           priority: TaskPriority.MEDIUM,
-          assigneeId: currentUser.id,
-          dueDate: Date.now() + 86400000,
-          createdAt: Date.now(),
-          client: 'New Client',
+          assignee_id: currentUser.id,
+          creator_id: currentUser.id,
+          due_date: new Date(Date.now() + 86400000).toISOString(),
+          client_id: null,
           tags: [],
           subtasks: [],
           attachments: [],
           comments: [],
-          timeSpent: 0,
+          time_spent: 0,
           accepted: false
       };
-      setTasks(prev => [...prev, newTask]);
-      setSelectedTaskId(newTask.id);
-      setIsTaskModalOpen(true);
-      addNotification('Task Created', 'New task added to Briefing.', 'success');
+      
+      const { data, error } = await supabase
+          .from('tasks')
+          .insert(newTask)
+          .select()
+          .single();
+
+      if (error) {
+          console.error('Error creating task:', error);
+          addNotification('Task Creation Failed', 'Could not create new task.', 'error');
+      } else if (data) {
+          setSelectedTaskId(data.id);
+          setIsTaskModalOpen(true);
+          addNotification('Task Created', 'New task added to Briefing.', 'success');
+          refetchData();
+      }
   };
   
-  const handleQuickCreateTask = (title: string, stageId: string) => {
-      const newTask: Task = {
-          id: `t${Date.now()}`,
+  const handleQuickCreateTask = async (title: string, stageId: string) => {
+      if (!currentUser) return;
+
+      const newTask = {
           title: title,
           description: '',
           stage: stageId,
           priority: TaskPriority.MEDIUM,
-          assigneeId: currentUser.id,
-          dueDate: Date.now() + 86400000,
-          createdAt: Date.now(),
-          client: 'New Client',
+          assignee_id: currentUser.id,
+          creator_id: currentUser.id,
+          due_date: new Date(Date.now() + 86400000).toISOString(),
+          client_id: null,
           tags: [],
           subtasks: [],
           attachments: [],
           comments: [],
-          timeSpent: 0,
+          time_spent: 0,
           accepted: false
       };
-      setTasks(prev => [...prev, newTask]);
-      addNotification('Task Created', `Added "${title}" to ${workflow.find(w => w.id === stageId)?.name}`, 'success');
+      
+      const { error } = await supabase.from('tasks').insert(newTask);
+
+      if (error) {
+          console.error('Error quick creating task:', error);
+          addNotification('Task Creation Failed', 'Could not create new task.', 'error');
+      } else {
+          addNotification('Task Created', `Added "${title}" to ${workflow.find(w => w.id === stageId)?.name}`, 'success');
+          refetchData();
+      }
   };
 
-  const handleAddEvent = (event: CalendarEvent) => {
-      setEvents(prev => [...prev, event]);
+  const handleAddEvent = async (event: CalendarEvent) => {
+      if (!currentUser) return;
+
+      const newEvent = {
+          creator_id: currentUser.id,
+          title: event.title,
+          description: event.description,
+          start_time: new Date(event.start).toISOString(),
+          end_time: new Date(event.end).toISOString(),
+          type: event.type,
+          platform: event.platform,
+          meeting_link: event.meetingLink,
+          task_id: event.taskId
+      };
+
+      const { error } = await supabase.from('calendar_events').insert(newEvent);
+      if (error) console.error('Error adding event:', error);
       addNotification('Event Created', `Added "${event.title}" to calendar.`, 'success');
+      refetchData();
   };
 
-  const handleDeleteEvent = (id: string) => {
-      setEvents(prev => prev.filter(e => e.id !== id));
+  const handleDeleteEvent = async (id: string) => {
+      const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+      if (error) console.error('Error deleting event:', error);
       addNotification('Event Deleted', 'Calendar event removed.', 'info');
+      refetchData();
+  };
+
+  // Client Management Handlers
+  const handleAddClient = async (clientData: Omit<Client, 'id'>) => {
+    if (!currentUser) return;
+    const { error } = await supabase.from('clients').insert({ ...clientData, creator_id: currentUser.id });
+    if (error) {
+      addNotification('Error', 'Failed to add client.', 'error');
+      console.error(error);
+    } else {
+      addNotification('Success', 'New client added.', 'success');
+      refetchData();
+    }
+  };
+
+  const handleUpdateClient = async (clientId: string, clientData: Omit<Client, 'id'>) => {
+    const { error } = await supabase.from('clients').update(clientData).eq('id', clientId);
+    if (error) {
+      addNotification('Error', 'Failed to update client.', 'error');
+      console.error(error);
+    } else {
+      addNotification('Success', 'Client details updated.', 'success');
+      refetchData();
+    }
+  };
+
+  const handleDeleteClient = async (clientId: string) => {
+    const { error } = await supabase.from('clients').delete().eq('id', clientId);
+    if (error) {
+      addNotification('Error', 'Failed to delete client. They may have associated tasks.', 'error');
+      console.error(error);
+    } else {
+      addNotification('Success', 'Client deleted.', 'warning');
+      refetchData();
+    }
   };
 
   // Redirect to allowed view if role changes
   useEffect(() => {
-     if (!isAuthenticated) return; // Don't redirect if not logged in
+     if (!isAuthenticated) return;
 
-     if ((currentView === 'approvals' || currentView === 'reports') && currentUser.role === UserRole.MEMBER) {
+     if ((currentView === 'approvals' || currentView === 'reports' || currentView === 'clients') && currentUser?.role === UserRole.MEMBER) {
          setCurrentView('dashboard');
      }
-     if (currentView === 'settings' && currentUser.role !== UserRole.ADMIN) {
+     if (currentView === 'settings' && currentUser?.role !== UserRole.ADMIN) {
          setCurrentView('dashboard');
      }
-  }, [currentUser.role, currentView, isAuthenticated]);
+  }, [currentUser?.role, currentView, isAuthenticated]);
+
+  // Loading State Render
+  if (isAuthLoading || dataLoading) {
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+        </div>
+    );
+  }
 
   // Main Render Logic
-  if (!isAuthenticated) {
-      return <Login users={users} onLogin={handleLogin} settings={settings} />;
+  if (!isAuthenticated || !currentUser) {
+      return <Login settings={settings} />;
   }
   
   // Merge Manual Events + Task Deadlines for Calendar
@@ -415,6 +648,38 @@ export const App: React.FC = () => {
       }))
   ];
 
+  const renderContent = () => {
+    switch (currentView) {
+      case 'dashboard':
+        return <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={handleUpdateUserStatus} onTaskClick={handleOpenTask} />;
+      case 'crm':
+        return <div className="h-full"><KanbanBoard tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} onUpdateTask={handleTaskUpdate} onTaskClick={handleOpenTask} onDeleteTask={handleDeleteTask} onExportTask={handleExportTask} onCreateTask={handleQuickCreateTask} currentUser={currentUser} /></div>;
+      case 'calendar':
+        return <CalendarView events={calendarEvents} onAddEvent={handleAddEvent} onDeleteEvent={handleDeleteEvent} />;
+      case 'clients':
+        return <ClientManagement clients={clients} onAddClient={handleAddClient} onUpdateClient={handleUpdateClient} onDeleteClient={handleDeleteClient} />;
+      case 'approvals':
+        return <ApprovalCenter tasks={tasks} onApprove={handleApproveFile} onReject={handleRejectFile} />;
+      case 'reports':
+        return <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />;
+      case 'settings':
+        return <Settings 
+                  settings={settings} 
+                  users={users} 
+                  workflow={workflow} 
+                  currentUser={currentUser} 
+                  onSave={handleSaveSettings} 
+                  onUpdateUserRole={handleUpdateUserRole} 
+                  onResetApp={handleResetApp} 
+                  onInviteNewMember={handleInviteNewMember} // Passar a nova função
+                />;
+      case 'profile':
+        return <ProfilePage currentUser={currentUser} onUpdateUser={handleUpdateUser} onUpdateAvatar={handleUpdateAvatar} themeColor={settings.themeColor} />;
+      default:
+        return <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={handleUpdateUserStatus} onTaskClick={handleOpenTask} />;
+    }
+  };
+
   return (
     <Layout 
         currentUser={currentUser} 
@@ -423,72 +688,14 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
         onNewTask={handleNewTask}
         settings={settings}
-        onToggleTheme={() => setSettings(prev => ({...prev, darkMode: !prev.darkMode}))}
+        onToggleTheme={() => {
+            addNotification('Theme Locked', 'Dark mode is currently disabled.', 'info');
+        }}
         notifications={notifications}
         onMarkRead={markNotificationRead}
         onClearNotifications={clearNotifications}
     >
-      {currentView === 'dashboard' ? (
-        <Dashboard 
-            tasks={tasks} 
-            workflow={workflow} 
-            themeColor={settings.themeColor} 
-            currentUser={currentUser} 
-            users={users}
-            notifications={notifications}
-            onUpdateUserStatus={handleUpdateUserStatus}
-            onTaskClick={handleOpenTask}
-        />
-      ) : currentView === 'crm' ? (
-        <div className="h-full">
-            <KanbanBoard 
-                tasks={tasks} 
-                users={users} 
-                workflow={workflow}
-                themeColor={settings.themeColor}
-                onUpdateTask={handleTaskUpdate}
-                onTaskClick={handleOpenTask}
-                onDeleteTask={handleDeleteTask}
-                onExportTask={handleExportTask}
-                onCreateTask={handleQuickCreateTask}
-                currentUser={currentUser}
-            />
-        </div>
-      ) : currentView === 'calendar' ? (
-        <CalendarView events={calendarEvents} onAddEvent={handleAddEvent} onDeleteEvent={handleDeleteEvent} />
-      ) : currentView === 'approvals' ? (
-        <ApprovalCenter tasks={tasks} onApprove={handleApproveFile} onReject={handleRejectFile} />
-      ) : currentView === 'reports' ? (
-        <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />
-      ) : currentView === 'settings' ? (
-        <Settings 
-            settings={settings}
-            users={users}
-            workflow={workflow}
-            currentUser={currentUser}
-            onUpdateSettings={setSettings}
-            onUpdateUsers={setUsers}
-            onUpdateWorkflow={setWorkflow}
-            onResetApp={handleResetApp}
-        />
-      ) : currentView === 'profile' ? (
-        <ProfilePage 
-            currentUser={currentUser}
-            onUpdateUser={handleUpdateUser}
-            themeColor={settings.themeColor}
-        />
-      ) : (
-        <Dashboard 
-            tasks={tasks} 
-            workflow={workflow} 
-            themeColor={settings.themeColor} 
-            currentUser={currentUser} 
-            users={users}
-            notifications={notifications}
-            onUpdateUserStatus={handleUpdateUserStatus}
-            onTaskClick={handleOpenTask}
-        />
-      )}
+      {renderContent()}
 
       {/* Transient Toasts */}
       <div className="fixed top-4 right-4 z-[60] space-y-3 pointer-events-none">
@@ -509,12 +716,13 @@ export const App: React.FC = () => {
         onClose={() => setIsTaskModalOpen(false)}
         task={selectedTask}
         users={users}
+        clients={clients}
         workflow={workflow}
         onUpdate={handleTaskUpdate}
         onAddComment={handleAddComment}
         onDelete={handleDeleteTask}
         onUpload={handleUploadAttachment}
-        onCloudImport={handleCloudImport}
+        onLinkImport={handleLinkImport}
         onAccept={handleAcceptTask}
         onApprove={handleApproveFile}
         onReject={handleRejectFile}

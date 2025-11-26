@@ -1,7 +1,24 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreHorizontal, Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, Trash2, Check, Download, CheckSquare } from 'lucide-react';
+import { MoreHorizontal, Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, Trash2, Download, CheckSquare } from 'lucide-react';
 import { Task, TaskPriority, User, WorkflowStage, UserRole } from '../types';
+import { QuickTaskForm } from './QuickTaskForm';
+
+// Helper to get a consistent color for a tag
+const getTagColor = (tag: string) => {
+    const colors = [
+        'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900',
+        'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-900',
+        'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-900',
+        'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-900',
+        'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-900',
+        'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-900',
+    ];
+    let hash = 0;
+    for (let i = 0; i < tag.length; i++) {
+        hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+};
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -92,13 +109,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'ALL'>('ALL');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('ALL');
   
-  // State for card context menu
   const [activeMenuTaskId, setActiveMenuTaskId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // State for inline task creation
   const [addingToStage, setAddingToStage] = useState<string | null>(null);
-  const [newTaskTitle, setNewTaskTitle] = useState('');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -119,17 +133,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     }
   };
 
-  const handleQuickCreate = (stageId: string) => {
-      if (newTaskTitle.trim()) {
-          onCreateTask(newTaskTitle, stageId);
-          setNewTaskTitle('');
-          setAddingToStage(null);
-      }
-  };
-
   const filteredTasks = tasks.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            task.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (task.clients?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                             task.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
                             task.id.toLowerCase().includes(searchQuery.toLowerCase());
       
@@ -162,7 +168,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Toolbar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 p-3 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 bg-white p-3 rounded-xl border border-gray-200 shadow-sm">
           <div className="relative w-full md:w-64">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input 
@@ -170,7 +176,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   placeholder="Search by ID, title..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent bg-transparent dark:text-white`}
+                  className={`w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent bg-transparent`}
               />
               {searchQuery && (
                   <button 
@@ -183,24 +189,24 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800">
-                  <Filter size={14} className="text-gray-500 dark:text-slate-400" />
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50">
+                  <Filter size={14} className="text-gray-500" />
                   <select 
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value as any)}
-                    className="bg-transparent border-none text-sm text-gray-700 dark:text-slate-200 focus:ring-0 p-0 cursor-pointer"
+                    className="bg-transparent border-none text-sm text-gray-700 focus:ring-0 p-0 cursor-pointer"
                   >
                       <option value="ALL">All Priorities</option>
                       {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
               </div>
 
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800">
-                  <span className="text-sm text-gray-500 dark:text-slate-400">Assignee:</span>
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 bg-gray-50">
+                  <span className="text-sm text-gray-500">Assignee:</span>
                   <select 
                     value={assigneeFilter}
                     onChange={(e) => setAssigneeFilter(e.target.value)}
-                    className="bg-transparent border-none text-sm text-gray-700 dark:text-slate-200 focus:ring-0 p-0 cursor-pointer min-w-[100px]"
+                    className="bg-transparent border-none text-sm text-gray-700 focus:ring-0 p-0 cursor-pointer min-w-[100px]"
                   >
                       <option value="ALL">All Members</option>
                       {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -210,38 +216,35 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       </div>
 
       {/* Board */}
-      <div className="flex-1 flex gap-6 overflow-x-auto pb-4 snap-x">
+      <div className="flex-1 flex flex-col lg:flex-row gap-6 overflow-x-auto lg:overflow-x-visible pb-4">
         {workflow.map((stage) => {
           const stageTasks = filteredTasks.filter((t) => t.stage === stage.id);
           
           return (
             <div
               key={stage.id}
-              className="flex-shrink-0 w-80 flex flex-col snap-center"
+              className="flex-shrink-0 w-full lg:w-80 flex flex-col"
               onDragOver={handleDragOver}
               onDrop={(e) => handleDrop(e, stage.id)}
             >
-              {/* Column Header */}
               <div className="flex items-center justify-between mb-4 px-1">
-                <h3 className="font-bold text-slate-700 dark:text-slate-200 uppercase text-sm tracking-wider flex items-center gap-2">
+                <h3 className="font-bold text-slate-700 uppercase text-sm tracking-wider flex items-center gap-2">
                   {stage.name}
-                  <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs py-0.5 px-2 rounded-full">
+                  <span className="bg-slate-200 text-slate-600 text-xs py-0.5 px-2 rounded-full">
                     {stageTasks.length}
                   </span>
                 </h3>
               </div>
 
-              {/* Drop Zone */}
               <div 
-                className={`flex-1 bg-slate-100/50 dark:bg-slate-900/50 rounded-xl p-2 space-y-3 overflow-y-auto hide-scrollbar border-2 ${
-                  draggedTaskId ? `border-dashed border-${themeColor}-200 bg-${themeColor}-50/30 dark:bg-${themeColor}-900/20` : 'border-transparent'
+                className={`flex-1 bg-slate-100/50 rounded-xl p-2 space-y-3 overflow-y-auto hide-scrollbar border-2 ${
+                  draggedTaskId ? `border-dashed border-${themeColor}-200 bg-${themeColor}-50/30` : 'border-transparent'
                 } transition-colors`}
               >
                 {stageTasks.map((task) => {
                   const assignee = users.find(u => u.id === task.assigneeId);
                   const isMenuOpen = activeMenuTaskId === task.id;
                   
-                  // Calculate subtask progress
                   const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
                   const totalSubtasks = task.subtasks?.length || 0;
 
@@ -251,36 +254,33 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       draggable
                       onDragStart={(e) => handleDragStart(e, task.id)}
                       onClick={() => onTaskClick(task.id)}
-                      className={`bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing border border-gray-100 dark:border-slate-800 transition-all group relative hover:border-${themeColor}-200 dark:hover:border-${themeColor}-800`}
+                      className={`bg-white p-4 rounded-lg shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing border border-gray-100 transition-all group relative hover:border-${themeColor}-200`}
                     >
-                      {/* Top Row: Priority, ID, Menu */}
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getPriorityColor(task.priority)}`}>
                               {task.priority}
                             </span>
-                            <span className="text-[10px] font-mono text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-800 px-1 rounded border border-gray-100 dark:border-slate-700">
+                            <span className="text-[10px] font-mono text-gray-400 bg-gray-50 px-1 rounded border border-gray-100">
                                 #{task.id}
                             </span>
                         </div>
                         
-                        {/* Context Menu Trigger */}
                         <div className="relative">
                            <button 
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setActiveMenuTaskId(isMenuOpen ? null : task.id);
                               }}
-                              className="p-1 text-gray-300 hover:text-gray-600 dark:text-slate-600 dark:hover:text-slate-400 rounded hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+                              className="p-1 text-gray-300 hover:text-gray-600 rounded hover:bg-gray-100 transition-colors"
                            >
                               <MoreHorizontal size={16} />
                            </button>
                            
-                           {/* Context Menu Dropdown */}
                            {isMenuOpen && (
                              <div 
                                ref={menuRef}
-                               className="absolute right-0 top-6 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+                               className="absolute right-0 top-6 w-40 bg-white rounded-lg shadow-xl border border-gray-100 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
                                onClick={(e) => e.stopPropagation()}
                              >
                                <button 
@@ -288,7 +288,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                     onExportTask(task.id);
                                     setActiveMenuTaskId(null);
                                   }}
-                                  className="w-full px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-indigo-600 flex items-center gap-2"
+                                  className="w-full px-4 py-2 text-left text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 flex items-center gap-2"
                                 >
                                   <Download size={14} /> Export CSV
                                </button>
@@ -297,7 +297,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                     onClick={() => {
                                       if(window.confirm('Are you sure you want to delete this task?')) onDeleteTask(task.id);
                                     }}
-                                    className="w-full px-4 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-gray-50 dark:border-slate-700"
+                                    className="w-full px-4 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-50"
                                  >
                                     <Trash2 size={14} /> Delete Task
                                  </button>
@@ -307,38 +307,34 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         </div>
                       </div>
 
-                      {/* Title */}
-                      <h4 className="font-semibold text-gray-800 dark:text-white mb-1 leading-tight">
+                      <h4 className="font-semibold text-gray-800 mb-1 leading-tight">
                           {task.title}
                       </h4>
-                      <p className="text-xs text-gray-500 dark:text-slate-400 line-clamp-2 mb-4">
-                          {task.description}
+                      <p className="text-xs text-gray-500 font-medium mb-3">
+                          {task.clients?.name || 'No Client'}
                       </p>
 
-                      {/* Tags */}
                       {task.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-3">
                            {task.tags.slice(0, 3).map(tag => (
-                            <span key={tag} className="text-[10px] font-medium px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700">
+                            <span key={tag} className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getTagColor(tag)}`}>
                               {tag}
                             </span>
                           ))}
                         </div>
                       )}
 
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-50 dark:border-slate-800">
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-50">
                           <div className="flex items-center gap-3">
                               {assignee && (
                                   <img 
                                       src={assignee.avatar} 
                                       alt={assignee.name} 
                                       title={assignee.name}
-                                      className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-slate-800" 
+                                      className="w-6 h-6 rounded-full ring-2 ring-white" 
                                   />
                               )}
                               
-                              {/* Attachments Count */}
                               {task.attachments.length > 0 && (
                                   <div className="flex items-center gap-1 text-gray-400 text-xs">
                                       <Paperclip size={12} />
@@ -346,7 +342,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                   </div>
                               )}
 
-                              {/* Subtasks Count */}
                               {totalSubtasks > 0 && (
                                   <div className={`flex items-center gap-1 text-xs ${completedSubtasks === totalSubtasks ? 'text-green-600' : 'text-gray-400'}`}>
                                       <CheckSquare size={12} />
@@ -364,43 +359,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   );
                 })}
                 
-                {/* Add Task: Inline Form vs Button */}
                 {canEdit && (
                   <>
                     {addingToStage === stage.id ? (
-                       <div className="bg-white dark:bg-slate-900 p-3 rounded-lg shadow-sm border border-indigo-200 dark:border-indigo-800 animate-in fade-in zoom-in-95 duration-200">
-                          <input 
-                             autoFocus
-                             type="text"
-                             placeholder="Enter task title..."
-                             value={newTaskTitle}
-                             onChange={(e) => setNewTaskTitle(e.target.value)}
-                             onKeyDown={(e) => {
-                               if (e.key === 'Enter') handleQuickCreate(stage.id);
-                               if (e.key === 'Escape') { setAddingToStage(null); setNewTaskTitle(''); }
-                             }}
-                             className="w-full text-sm border-none p-0 focus:ring-0 mb-2 font-medium text-gray-800 dark:text-white placeholder-gray-400 bg-transparent"
-                          />
-                          <div className="flex justify-end gap-2">
-                             <button 
-                                onClick={() => { setAddingToStage(null); setNewTaskTitle(''); }}
-                                className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-400"
-                             >
-                                <X size={16} />
-                             </button>
-                             <button 
-                                onClick={() => handleQuickCreate(stage.id)}
-                                disabled={!newTaskTitle.trim()}
-                                className={`p-1 rounded text-white ${newTaskTitle.trim() ? `bg-${themeColor}-600 hover:bg-${themeColor}-700` : 'bg-gray-300 dark:bg-slate-700'}`}
-                             >
-                                <Check size={16} />
-                             </button>
-                          </div>
-                       </div>
+                       <QuickTaskForm 
+                          stageId={stage.id}
+                          themeColor={themeColor}
+                          onCreateTask={onCreateTask}
+                          onCancel={() => setAddingToStage(null)}
+                       />
                     ) : (
                       <button 
                         onClick={() => setAddingToStage(stage.id)}
-                        className={`w-full py-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-700 text-gray-400 hover:border-${themeColor}-400 hover:text-${themeColor}-500 flex items-center justify-center gap-2 text-sm transition-colors`}
+                        className={`w-full py-2 rounded-lg border border-dashed border-gray-300 text-gray-400 hover:border-${themeColor}-400 hover:text-${themeColor}-500 flex items-center justify-center gap-2 text-sm transition-colors`}
                       >
                         <Plus size={16} />
                         Add Task

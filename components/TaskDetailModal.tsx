@@ -1,12 +1,29 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, Cloud, HardDrive, FileText, CheckSquare, GripVertical } from 'lucide-react';
-import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask } from '../types';
+import { X, Calendar, Tag, User as UserIcon, Paperclip, MessageSquare, Send, Trash2, CheckCircle, AlertCircle, Clock, Upload, Timer, Plus, PlayCircle, ShieldAlert, HardDrive, FileText, CheckSquare, GripVertical, Briefcase, Link as LinkIcon } from 'lucide-react';
+import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask, Client, Attachment } from '../types';
+
+// Helper to get a consistent color for a tag
+const getTagColor = (tag: string) => {
+    const colors = [
+        'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900',
+        'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-900',
+        'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-900',
+        'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-900',
+        'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-900',
+        'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-900',
+    ];
+    let hash = 0;
+    for (let i = 0; i < tag.length; i++) {
+        hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+};
 
 interface TaskDetailModalProps {
   task: Task | null;
   currentUser: User;
   users: User[];
+  clients: Client[];
   workflow: WorkflowStage[]; 
   isOpen: boolean;
   onClose: () => void;
@@ -14,7 +31,7 @@ interface TaskDetailModalProps {
   onAddComment: (taskId: string, text: string) => void;
   onDelete: (taskId: string) => void;
   onUpload: (taskId: string, file: File) => void;
-  onCloudImport: (taskId: string, service: string) => void;
+  onLinkImport: (taskId: string, url: string) => void;
   onAccept: (taskId: string) => void;
   onApprove: (taskId: string, attachmentId: string) => void;
   onReject: (taskId: string, attachmentId: string) => void;
@@ -24,6 +41,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   task, 
   currentUser,
   users, 
+  clients,
   workflow,
   isOpen, 
   onClose, 
@@ -31,7 +49,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   onAddComment,
   onDelete,
   onUpload,
-  onCloudImport,
+  onLinkImport,
   onAccept,
   onApprove,
   onReject
@@ -41,24 +59,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [newTag, setNewTag] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
   const [addTimeAmount, setAddTimeAmount] = useState(30);
-  const [showCloudMenu, setShowCloudMenu] = useState(false);
+  const [showLinkInput, setShowLinkInput] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cloudMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setEditedTask(task);
-  }, [task]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (cloudMenuRef.current && !cloudMenuRef.current.contains(event.target as Node)) {
-        setShowCloudMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (!isOpen) {
+        setShowLinkInput(false);
+        setLinkUrl('');
+    }
+  }, [task, isOpen]);
 
   if (!isOpen || !editedTask) return null;
 
@@ -122,6 +134,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       }
   };
 
+  const handleLinkSubmit = () => {
+      if (linkUrl.trim()) {
+          onLinkImport(editedTask.id, linkUrl.trim());
+          setLinkUrl('');
+          setShowLinkInput(false);
+      }
+  };
+
   const handleAddTime = () => {
       const newTime = (editedTask.timeSpent || 0) + Number(addTimeAmount);
       handleSaveField('timeSpent', newTime);
@@ -134,7 +154,19 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     return `${m}m`;
   };
 
+  const formatDateForInput = (dateValue: string | number | null | undefined): string => {
+    if (!dateValue) return '';
+    try {
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) return '';
+        return date.toISOString().split('T')[0];
+    } catch (error) {
+        return '';
+    }
+  };
+
   const assignee = users.find(u => u.id === editedTask.assigneeId);
+  const client = clients.find(c => c.id === editedTask.clientId);
   const isAssignee = currentUser.id === editedTask.assigneeId;
   const isAdminOrManager = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER;
 
@@ -321,32 +353,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     className="hidden" 
                  />
                  
-                 {/* Upload allowed if NOT in review/approved OR if user is Admin/Manager */}
                  {(!isInReview && !isApproved || isAdminOrManager) && (
-                     <div className="flex items-center gap-2" ref={cloudMenuRef}>
-                        <div className="relative">
-                           <button 
-                                onClick={() => setShowCloudMenu(!showCloudMenu)}
-                                className="text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors text-gray-600 hover:bg-gray-100 border border-gray-200"
-                           >
-                              <Cloud size={12} /> Import
-                           </button>
-                           
-                           {showCloudMenu && (
-                             <div className="absolute right-0 top-8 w-48 bg-white rounded-lg shadow-xl border border-gray-100 z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                                <button onClick={() => { onCloudImport(editedTask.id, 'google_drive'); setShowCloudMenu(false); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-2">
-                                  <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" className="w-4 h-4" alt="Drive"/> Google Drive
-                                </button>
-                                <button onClick={() => { onCloudImport(editedTask.id, 'dropbox'); setShowCloudMenu(false); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-2">
-                                  <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Dropbox_Icon.svg" className="w-4 h-4" alt="Dropbox"/> Dropbox
-                                </button>
-                                <button onClick={() => { onCloudImport(editedTask.id, 'onedrive'); setShowCloudMenu(false); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-xs font-medium text-gray-700 flex items-center gap-2">
-                                  <img src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Microsoft_Office_OneDrive_%282019%E2%80%93present%29.svg" className="w-4 h-4" alt="OneDrive"/> OneDrive
-                                </button>
-                             </div>
-                           )}
-                        </div>
-
+                     <div className="flex items-center gap-2">
+                        <button 
+                           onClick={() => setShowLinkInput(true)}
+                           className="text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors text-gray-600 hover:bg-gray-100 border border-gray-200"
+                        >
+                           <LinkIcon size={12} /> Link
+                        </button>
                         <button 
                            onClick={() => fileInputRef.current?.click()}
                            className={`text-xs font-medium flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors ${
@@ -361,6 +375,21 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                      </div>
                  )}
               </div>
+
+              {showLinkInput && (
+                <div className="flex gap-2 mb-3 p-2 border border-dashed rounded-lg">
+                    <input 
+                        type="text"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleLinkSubmit()}
+                        placeholder="Paste image or video URL here..."
+                        className="flex-1 bg-transparent text-sm focus:ring-0 border-none"
+                    />
+                    <button onClick={() => setShowLinkInput(false)} className="text-gray-400 hover:text-gray-600 p-1"><X size={14}/></button>
+                    <button onClick={handleLinkSubmit} className="bg-indigo-600 text-white text-xs font-bold px-3 rounded">Add</button>
+                </div>
+              )}
 
               <div className="space-y-2">
                 {editedTask.attachments.map(att => (
@@ -405,7 +434,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         </div>
                         
                         <div className="flex items-center gap-2">
-                            {/* Approval Buttons only for PENDING DELIVERABLES and accessible by ADMIN/MANAGER */}
                             {att.status === 'pending' && att.category === 'deliverable' && isAdminOrManager && (
                                 <>
                                     <button 
@@ -443,7 +471,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     >
                         <div className="flex justify-center gap-4 mb-2 opacity-40 group-hover:opacity-60 transition-opacity">
                            <HardDrive size={24} />
-                           <Cloud size={24} />
                         </div>
                         <p className="text-sm text-gray-400">Drag files here, click to upload, or use Import</p>
                     </div>
@@ -559,10 +586,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <input 
                             type="date"
                             readOnly={!isAdminOrManager}
-                            value={new Date(editedTask.dueDate).toISOString().split('T')[0]}
+                            value={formatDateForInput(editedTask.dueDate)}
                             onChange={(e) => {
-                                const date = new Date(e.target.value);
-                                handleSaveField('dueDate', date.getTime());
+                                if (e.target.value) {
+                                    const date = new Date(e.target.value);
+                                    handleSaveField('dueDate', date.getTime());
+                                } else {
+                                    handleSaveField('dueDate', null);
+                                }
                             }}
                             className="flex-1 bg-transparent text-sm text-gray-700 border-none focus:ring-0 p-0"
                         />
@@ -607,22 +638,29 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
                 <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Client</label>
-                    <input 
-                        type="text"
-                        readOnly={!isAdminOrManager}
-                        value={editedTask.client}
-                        onChange={(e) => handleSaveField('client', e.target.value)}
-                        className="w-full p-2 bg-white rounded-lg border border-gray-200 shadow-sm text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                    />
+                    <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200 shadow-sm">
+                        <Briefcase size={16} className="text-gray-400 ml-1" />
+                        <select 
+                            value={editedTask.clientId || ''}
+                            disabled={!isAdminOrManager}
+                            onChange={(e) => handleSaveField('clientId', e.target.value || null)}
+                            className="flex-1 bg-transparent text-sm text-gray-700 border-none focus:ring-0 cursor-pointer p-0 disabled:cursor-not-allowed"
+                        >
+                            <option value="">No Client</option>
+                            {clients.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
 
                 <div>
                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5 block">Tags</label>
                     <div className="flex flex-wrap gap-2 mb-2">
                         {editedTask.tags.map(tag => (
-                            <span key={tag} className="bg-white border border-gray-200 text-gray-600 px-2 py-1 rounded text-xs flex items-center gap-1 group">
+                            <span key={tag} className={`font-bold px-2 py-1 rounded text-xs flex items-center gap-1.5 group border ${getTagColor(tag)}`}>
                                 {tag}
-                                <button onClick={() => removeTag(tag)} className="hover:text-red-500"><X size={10}/></button>
+                                <button onClick={() => removeTag(tag)} className="opacity-50 group-hover:opacity-100 hover:text-red-500"><X size={12}/></button>
                             </span>
                         ))}
                     </div>

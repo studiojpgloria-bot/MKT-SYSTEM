@@ -1,44 +1,17 @@
-
-import React, { useState } from 'react';
-import { User, SystemSettings } from '../types';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import React from 'react';
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { supabase } from '../integrations/supabase/client';
+import { SystemSettings } from '../types';
+import { ShieldCheck } from 'lucide-react';
 
 interface LoginProps {
-  users: User[];
-  onLogin: (user: User) => void;
   settings: SystemSettings;
 }
 
-export const Login: React.FC<LoginProps> = ({ users, onLogin, settings }) => {
-  const [email, setEmail] = useState('alice@nexus.com'); // Default for demo convenience
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    // Simulate network delay and authentication
-    setTimeout(() => {
-      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-      
-      if (user) {
-        // In a real app, we would validate the password hash here.
-        // For this demo, we just check if the user exists.
-        onLogin(user);
-      } else {
-        setError('Invalid credentials. Please check your email.');
-        setIsLoading(false);
-      }
-    }, 800);
-  };
-
-  const handleDemoClick = (demoEmail: string) => {
-    setEmail(demoEmail);
-    setPassword('password');
-  };
+export const Login: React.FC<LoginProps> = ({ settings }) => {
+  
+  // Note: The actual authentication state and redirection are now handled by SupabaseProvider in App.tsx
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center p-4 transition-colors duration-300">
@@ -54,72 +27,47 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings }) => {
               <p className="text-gray-500 dark:text-slate-400">{settings.loginScreen.subtitle}</p>
            </div>
 
-           <form onSubmit={handleLogin} className="space-y-6">
-              <div>
-                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Email Address</label>
-                 <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input 
-                      type="email" 
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className={`w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-${settings.themeColor}-500 focus:border-${settings.themeColor}-500 transition-all`}
-                      placeholder="Enter your email"
-                    />
-                 </div>
-              </div>
-
-              <div>
-                 <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">Password</label>
-                 <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input 
-                      type="password" 
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className={`w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-${settings.themeColor}-500 focus:border-${settings.themeColor}-500 transition-all`}
-                      placeholder="••••••••"
-                    />
-                 </div>
-              </div>
-
-              {error && (
-                <div className="flex items-center gap-2 text-red-600 text-sm bg-red-50 dark:bg-red-900/20 p-3 rounded-lg border border-red-100 dark:border-red-900">
-                   <AlertCircle size={16} />
-                   {error}
-                </div>
-              )}
-
-              <button 
-                type="submit"
-                disabled={isLoading}
-                className={`w-full bg-${settings.themeColor}-600 hover:bg-${settings.themeColor}-700 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed`}
-              >
-                {isLoading ? (
-                  <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                ) : (
-                  <>
-                    Sign In <ArrowRight size={20} />
-                  </>
-                )}
-              </button>
-           </form>
-
-           <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800">
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-3">Quick Demo Login</p>
-              <div className="flex gap-3">
-                 <button onClick={() => handleDemoClick('alice@nexus.com')} className="flex-1 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 py-2 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/50 font-medium transition-colors">
-                    Admin
-                 </button>
-                 <button onClick={() => handleDemoClick('bob@nexus.com')} className="flex-1 text-xs bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 py-2 rounded hover:bg-purple-100 dark:hover:bg-purple-900/50 font-medium transition-colors">
-                    Manager
-                 </button>
-                 <button onClick={() => handleDemoClick('charlie@nexus.com')} className="flex-1 text-xs bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 py-2 rounded hover:bg-emerald-100 dark:hover:bg-emerald-900/50 font-medium transition-colors">
-                    Member
-                 </button>
-              </div>
-           </div>
+           <Auth
+              supabaseClient={supabase}
+              providers={[]}
+              appearance={{
+                theme: ThemeSupa,
+                variables: {
+                    default: {
+                        colors: {
+                            brand: '#4f46e5', // Default indigo
+                            brandAccent: '#6366f1',
+                        },
+                    },
+                },
+              }}
+              theme={settings.darkMode ? "dark" : "light"}
+              localization={{
+                variables: {
+                    sign_in: {
+                        email_label: 'Email Address',
+                        password_label: 'Password',
+                        email_input_placeholder: 'Enter your email',
+                        password_input_placeholder: '••••••••',
+                        button_label: 'Sign In',
+                        loading_button_label: 'Signing In...',
+                        link_text: 'Already have an account? Sign In',
+                    },
+                    sign_up: {
+                        email_label: 'Email Address',
+                        password_label: 'Create Password',
+                        email_input_placeholder: 'Enter your email',
+                        password_input_placeholder: '••••••••',
+                        button_label: 'Sign Up',
+                        loading_button_label: 'Signing Up...',
+                        link_text: 'Don\'t have an account? Sign Up',
+                    },
+                    forgotten_password: {
+                        link_text: 'Forgot your password?',
+                    },
+                },
+              }}
+            />
         </div>
 
         {/* Right Side - Banner */}
