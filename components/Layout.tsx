@@ -1,4 +1,4 @@
-import React, from 'react';
+import React from 'react';
 import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, User as UserIcon, Briefcase, X } from 'lucide-react';
 import { User, UserRole, SystemSettings, Notification } from '../types';
 
