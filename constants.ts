@@ -7,6 +7,7 @@ export const MOCK_USERS: User[] = [
     name: 'JP Gloria (Admin)',
     role: UserRole.ADMIN,
     email: 'studiojpgloria@gmail.com',
+    password: 'password',
     avatar: 'https://ui-avatars.com/api/?name=JP+Gloria&background=6366f1&color=fff',
     status: 'online',
     lastSeen: Date.now()

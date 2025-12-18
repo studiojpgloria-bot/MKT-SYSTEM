@@ -84,11 +84,15 @@ export const Layout: React.FC<LayoutProps> = ({
       >
         <div className="h-20 flex items-center justify-between px-6">
           {isSidebarOpen && (
-            <div className="flex items-center gap-2">
-               <div className={`w-8 h-8 rounded-full bg-gradient-to-tr from-${themeColor}-600 to-${themeColor}-400 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.4)]`}>
-                  <span className="font-bold text-white text-sm">{settings.companyName.charAt(0)}</span>
-               </div>
-               <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">{settings.companyName.split(' ')[0]}</span>
+            <div className="flex items-center gap-3">
+               {settings.companyLogo ? (
+                 <img src={settings.companyLogo} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
+               ) : (
+                 <div className={`w-8 h-8 rounded-full bg-gradient-to-tr from-${themeColor}-600 to-${themeColor}-400 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.4)]`}>
+                    <span className="font-bold text-white text-sm">{settings.companyName.charAt(0)}</span>
+                 </div>
+               )}
+               <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white truncate">{settings.companyName.split(' ')[0]}</span>
             </div>
           )}
           <button

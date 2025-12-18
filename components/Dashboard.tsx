@@ -98,12 +98,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="space-y-6 pb-10">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div onClick={() => onNavigate('crm')} className="bg-white p-6 rounded-3xl shadow-lg relative overflow-hidden cursor-pointer hover:shadow-xl transition-shadow border border-gray-100">
-             <div className="flex justify-between items-start mb-6 text-gray-600">
+        <div onClick={() => onNavigate('crm')} className="bg-white dark:bg-[#151a21] p-6 rounded-3xl border border-gray-100 dark:border-[#2a303c]/50 shadow-lg relative overflow-hidden cursor-pointer hover:shadow-xl transition-all">
+             <div className="flex justify-between items-start mb-6 text-gray-600 dark:text-gray-400">
                  <span className="font-medium">{isMember ? "Meus Cards" : "Total de Cards"}</span>
-                 <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white"><TrendingUp size={20} /></div>
+                 <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg"><TrendingUp size={20} /></div>
              </div>
-             <h3 className="text-4xl font-bold mb-2 text-gray-900">{displayCardCount}</h3>
+             <h3 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white">{displayCardCount}</h3>
              <p className="text-xs text-gray-500 font-bold">+2.5% vs mês anterior</p>
         </div>
 
@@ -156,54 +156,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                 ))}
              </div>
-          </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-[#151a21] rounded-3xl p-6 border border-gray-200 dark:border-[#2a303c]/50 h-[400px] flex flex-col">
-             <h3 className="font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-2">
-                <CheckCircle size={18} className="text-blue-500"/> Proximas Entregas
-             </h3>
-             <div className="flex-1 overflow-y-auto space-y-3 pr-2">
-                {pendingTasksList.map(task => (
-                    <div key={task.id} onClick={() => onTaskClick && onTaskClick(task.id)} className="p-4 bg-gray-50 dark:bg-[#0b0e11] rounded-2xl border border-gray-200 dark:border-[#2a303c] hover:border-blue-500 transition-all cursor-pointer group">
-                        <div className="flex justify-between mb-2">
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{task.client}</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${task.priority === 'URGENT' ? 'bg-red-500/10 text-red-500' : 'bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>{task.priority}</span>
-                        </div>
-                        <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-1 group-hover:text-blue-400 transition-colors">{task.title}</h4>
-                        <div className="flex items-center gap-2 text-xs text-gray-500"><Clock size={12} /> {new Date(task.dueDate).toLocaleDateString()}</div>
-                    </div>
-                ))}
-             </div>
-          </div>
-
-          <div className="bg-white dark:bg-[#151a21] rounded-3xl p-6 border border-gray-200 dark:border-[#2a303c]/50 h-[400px] flex flex-col">
-              <h3 className="font-bold text-gray-900 dark:text-white mb-4">Distribuição</h3>
-              <div className="flex-1 flex items-center justify-center relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                        <Pie
-                            data={[
-                                { name: 'Design', value: 40 },
-                                { name: 'Copy', value: 30 },
-                                { name: 'Estratégia', value: 20 },
-                                { name: 'Admin', value: 10 },
-                            ]}
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                        >
-                            <Cell fill="#3b82f6" /><Cell fill="#f59e0b" /><Cell fill="#10b981" /><Cell fill="#ef4444" />
-                        </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-center">
-                      <span className="text-2xl font-bold text-gray-900 dark:text-white block">85%</span>
-                      <span className="text-xs text-gray-500">Média</span>
-                  </div>
-              </div>
           </div>
       </div>
     </div>

@@ -3,14 +3,6 @@ import React, { useState, useRef } from 'react';
 import { UploadCloud, CheckCircle, AlertTriangle, FileText, X, ChevronRight, Play, Download, Loader2, Info, UserPlus, Filter } from 'lucide-react';
 import { Task, User, TaskPriority, WorkflowStage } from '../types';
 
-interface NiftyImportViewProps {
-  users: User[];
-  workflow: WorkflowStage[];
-  onImportTasks: (tasks: Task[]) => void;
-  themeColor: string;
-  allTasks: Task[];
-}
-
 interface CSVRow {
   "Task Name": string;
   "Description": string;
@@ -31,6 +23,14 @@ interface ImportItem {
   errors: string[];
   status: 'pending' | 'processing' | 'success' | 'error' | 'queued';
   actionTaken?: string;
+}
+
+interface NiftyImportViewProps {
+  users: User[];
+  workflow: WorkflowStage[];
+  onImportTasks: (tasks: Task[]) => void;
+  themeColor: string;
+  allTasks: Task[];
 }
 
 export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflow, onImportTasks, themeColor, allTasks }) => {
@@ -103,11 +103,11 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
       // Map Status
       let stageId = targetStageId;
       const s = row.Status?.toLowerCase();
-      if (s === 'complete') stageId = 'approved'; // Assumes approved exists
+      if (s === 'complete') stageId = 'approved'; 
       if (s === 'in progress') stageId = 'design';
 
       // Parse Date
-      let dueDate = Date.now() + (7 * 86400000); // Default + 7 days
+      let dueDate = Date.now() + (7 * 86400000); 
       if (row["Due Date"]) {
           const d = new Date(row["Due Date"]);
           if (!isNaN(d.getTime())) dueDate = d.getTime();
@@ -177,7 +177,7 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
         );
         if (isDuplicate) {
             action = 'Duplicata Ignorada';
-            finalStatus = 'pending'; // skip it
+            finalStatus = 'pending'; 
         } else {
             successfullyMappedTasks.push(task);
         }
@@ -185,7 +185,6 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
         setItems(prev => prev.map(p => p.id === item.id ? { ...p, status: finalStatus, actionTaken: action } : p));
         setProgress(Math.round(((i + 1) / items.length) * 100));
         
-        // Minor delay for visual effect / prevent UI freezing on large batches
         if (i % 20 === 0) await new Promise(r => setTimeout(r, 10));
     }
 
@@ -201,7 +200,6 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
     setProgress(0);
   };
 
-  // --- Rendering ---
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-12 animate-in fade-in duration-300">
       
@@ -307,11 +305,9 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
                   </div>
               </div>
 
-              {/* Sidebar Config */}
               <div className="space-y-6">
                   <div className="bg-[#151a21] border border-[#2a303c] rounded-[32px] p-6 space-y-6">
                       <h3 className="text-lg font-bold text-white">Configurações</h3>
-                      
                       <div className="space-y-4">
                           <div>
                               <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest block mb-2">Destino no Kanban</label>
@@ -323,48 +319,29 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
                                   {workflow.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                               </select>
                           </div>
-
                           <div className="p-4 bg-[#0b0e11] rounded-2xl border border-[#2a303c] space-y-4">
                               <label className="flex items-center justify-between cursor-pointer group">
                                   <div className="flex flex-col">
                                       <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">Respeitar Disponibilidade</span>
                                       <span className="text-[10px] text-gray-500">Pausa tarefas se usuário estiver ocupado</span>
                                   </div>
-                                  <input 
-                                      type="checkbox" 
-                                      checked={applyAvailability} 
-                                      onChange={(e) => setApplyAvailability(e.target.checked)}
-                                      className="sr-only peer"
-                                  />
+                                  <input type="checkbox" checked={applyAvailability} onChange={(e) => setApplyAvailability(e.target.checked)} className="sr-only peer" />
                                   <div className="w-10 h-5 bg-[#2a303c] rounded-full relative after:absolute after:top-1 after:left-1 after:w-3 after:h-3 after:bg-white after:rounded-full after:transition-all peer-checked:bg-blue-600 peer-checked:after:translate-x-5"></div>
                               </label>
-
                               <label className="flex items-center justify-between cursor-pointer group">
                                   <div className="flex flex-col">
                                       <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors">Critical = Urgente</span>
                                       <span className="text-[10px] text-gray-500">Ignora filas para tarefas críticas</span>
                                   </div>
-                                  <input 
-                                      type="checkbox" 
-                                      checked={markCriticalUrgent} 
-                                      onChange={(e) => setMarkCriticalUrgent(e.target.checked)}
-                                      className="sr-only peer"
-                                  />
+                                  <input type="checkbox" checked={markCriticalUrgent} onChange={(e) => setMarkCriticalUrgent(e.target.checked)} className="sr-only peer" />
                                   <div className="w-10 h-5 bg-[#2a303c] rounded-full relative after:absolute after:top-1 after:left-1 after:w-3 after:h-3 after:bg-white after:rounded-full after:transition-all peer-checked:bg-blue-600 peer-checked:after:translate-x-5"></div>
                               </label>
                           </div>
                       </div>
-
-                      <button 
-                          onClick={() => setStep(3)}
-                          className={`w-full py-4 bg-${themeColor}-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2`}
-                      >
+                      <button onClick={() => setStep(3)} className={`w-full py-4 bg-${themeColor}-600 text-white font-bold rounded-2xl shadow-lg hover:shadow-blue-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2`}>
                           <Play size={18} fill="currentColor" /> Iniciar Importação
                       </button>
-
-                      <button onClick={reset} className="w-full py-3 text-sm text-gray-500 hover:text-white transition-colors">
-                          Mudar arquivo
-                      </button>
+                      <button onClick={reset} className="w-full py-3 text-sm text-gray-500 hover:text-white transition-colors">Mudar arquivo</button>
                   </div>
               </div>
           </div>
@@ -382,10 +359,7 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
                         <h2 className="text-2xl font-bold text-white">Tudo pronto!</h2>
                         <p className="text-gray-500">Clique no botão abaixo para processar {items.length} tarefas.</p>
                     </div>
-                    <button 
-                        onClick={runImport}
-                        className={`px-12 py-4 bg-${themeColor}-600 text-white font-black rounded-2xl shadow-xl hover:scale-105 transition-all`}
-                    >
+                    <button onClick={runImport} className={`px-12 py-4 bg-${themeColor}-600 text-white font-black rounded-2xl shadow-xl hover:scale-105 transition-all`}>
                         COMEÇAR AGORA
                     </button>
                   </>
@@ -394,17 +368,7 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
                     <div className="relative w-32 h-32">
                         <svg className="w-full h-full" viewBox="0 0 100 100">
                             <circle className="text-[#2a303c] stroke-current" strokeWidth="8" fill="transparent" r="40" cx="50" cy="50" />
-                            <circle 
-                                className={`text-${themeColor}-500 stroke-current transition-all duration-300`} 
-                                strokeWidth="8" 
-                                strokeDasharray={2 * Math.PI * 40}
-                                strokeDashoffset={2 * Math.PI * 40 * (1 - progress / 100)}
-                                strokeLinecap="round" 
-                                fill="transparent" 
-                                r="40" 
-                                cx="50" 
-                                cy="50" 
-                            />
+                            <circle className={`text-${themeColor}-500 stroke-current transition-all duration-300`} strokeWidth="8" strokeDasharray={2 * Math.PI * 40} strokeDashoffset={2 * Math.PI * 40 * (1 - progress / 100)} strokeLinecap="round" fill="transparent" r="40" cx="50" cy="50" />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span className="text-2xl font-black text-white">{progress}%</span>
@@ -447,7 +411,6 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
                       <p className="text-xs font-bold text-red-500/50 uppercase mt-2">Erros</p>
                   </div>
               </div>
-
               <div className="bg-[#151a21] border border-[#2a303c] rounded-[32px] p-8 text-center space-y-6">
                   <div className="w-20 h-20 bg-green-500/10 text-green-400 rounded-full flex items-center justify-center mx-auto">
                       <CheckCircle size={40} />
@@ -457,18 +420,8 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
                       <p className="text-gray-500">Os dados foram integrados com sucesso ao seu CRM.</p>
                   </div>
                   <div className="flex items-center justify-center gap-4">
-                      <button 
-                        onClick={() => window.location.href = '#crm'} 
-                        className={`px-8 py-3 bg-${themeColor}-600 text-white font-bold rounded-xl shadow-lg`}
-                      >
-                          Ir para o Kanban
-                      </button>
-                      <button 
-                        onClick={reset}
-                        className="px-8 py-3 bg-[#0b0e11] border border-[#2a303c] text-white font-bold rounded-xl"
-                      >
-                          Nova Importação
-                      </button>
+                      <button onClick={() => window.location.href = '#crm'} className={`px-8 py-3 bg-${themeColor}-600 text-white font-bold rounded-xl shadow-lg`}>Ir para o Kanban</button>
+                      <button onClick={reset} className="px-8 py-3 bg-[#0b0e11] border border-[#2a303c] text-white font-bold rounded-xl">Nova Importação</button>
                   </div>
               </div>
           </div>

@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Task, User, UserRole, WorkflowStage, SystemSettings, Notification, 
-  CalendarEvent, Document, TaskStage
+  CalendarEvent, Document, TaskStage, Attachment
 } from './types';
 import { 
   MOCK_USERS, INITIAL_TASKS, INITIAL_EVENTS, INITIAL_SETTINGS, INITIAL_DOCUMENTS 
@@ -18,8 +19,6 @@ import { DocumentsView } from './components/DocumentsView';
 import { TaskDetailModal } from './components/TaskDetailModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { DocumentEditorModal } from './components/DocumentEditorModal';
-import { NotificationToast } from './components/NotificationToast';
-import { NiftyImportView } from './components/NiftyImportView';
 import { supabase } from './supabase';
 
 export const App: React.FC = () => {
@@ -49,44 +48,25 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
-  const resetAndSeedDatabase = async () => {
-    setIsLoading(true);
-    try {
-        console.log("Iniciando Reset de Banco de Dados...");
-        
-        await supabase.from('tasks').delete().neq('id', 'void');
-        await supabase.from('documents').delete().neq('id', 'void');
-        await supabase.from('calendar_events').delete().neq('id', 'void');
-        await supabase.from('workflow_stages').delete().neq('id', 'void');
-        await supabase.from('users_profiles').delete().neq('id', 'void');
-        await supabase.from('system_settings').delete().neq('companyName', 'void');
-
-        const { error: userErr } = await supabase.from('users_profiles').insert(MOCK_USERS);
-        if (userErr) throw userErr;
-
-        await supabase.from('system_settings').insert([INITIAL_SETTINGS]);
-        await supabase.from('workflow_stages').insert(workflow);
-
-        console.log("Banco de dados resetado e semeado com sucesso!");
-        alert("Sistema Inicializado com o novo Admin: studiojpgloria@gmail.com");
-        window.location.reload();
-    } catch (err) {
-        console.error("Erro ao resetar banco:", err);
-        alert("Erro ao sincronizar reset. Verifique as permissões do Supabase.");
-    } finally {
-        setIsLoading(false);
-    }
+  const sanitizeUserForDb = (user: User) => {
+    const payload: any = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      status: user.status
+    };
+    // Adiciona password apenas se presente para evitar erros de schema cache se a coluna for recém-criada
+    if (user.password) payload.password = user.password;
+    return payload;
   };
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data: userData } = await supabase.from('users_profiles').select('*');
-      if (!userData || userData.length === 0) {
-          setUsers(MOCK_USERS);
-      } else {
-          setUsers(userData);
-      }
+      if (userData) setUsers(userData.map(u => ({ ...u, lastSeen: Date.now() })));
 
       const { data: taskData } = await supabase.from('tasks').select('*');
       if (taskData) setTasks(taskData);
@@ -97,395 +77,81 @@ export const App: React.FC = () => {
       const { data: eventData } = await supabase.from('calendar_events').select('*');
       if (eventData) setEvents(eventData);
 
-      const { data: settingsData, error: settingsError } = await supabase.from('system_settings').select('*').maybeSingle();
-      if (settingsData && !settingsError) {
-          setSettings({
-              ...INITIAL_SETTINGS,
-              ...settingsData,
-              loginScreen: { 
-                ...INITIAL_SETTINGS.loginScreen, 
-                ...(settingsData.loginScreen || {}) 
-              },
-              notifications: { 
-                ...INITIAL_SETTINGS.notifications, 
-                ...(settingsData.notifications || {}) 
-              },
-              security: { 
-                ...INITIAL_SETTINGS.security, 
-                ...(settingsData.security || {}) 
-              },
-              workflowRules: { 
-                ...INITIAL_SETTINGS.workflowRules, 
-                ...(settingsData.workflowRules || {}) 
-              }
-          });
-      }
+      const { data: settingsData } = await supabase.from('system_settings').select('*').maybeSingle();
+      if (settingsData) setSettings({ ...INITIAL_SETTINGS, ...settingsData });
 
       const { data: flowData } = await supabase.from('workflow_stages').select('*');
       if (flowData && flowData.length > 0) setWorkflow(flowData);
-
     } catch (err) {
-      console.error("Supabase Fetch Error:", err);
+      console.error("Fetch Error:", err);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
-
-  const addNotification = (title: string, message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
-    const newNotif: Notification = {
-      id: `n-${Date.now()}`,
-      userId: currentUser?.id || 'system',
-      title,
-      message,
-      type,
-      read: false,
-      timestamp: Date.now()
-    };
-    setNotifications(prev => [newNotif, ...prev]);
-  };
-
-  const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    if (settings?.darkMode !== undefined) {
-      document.documentElement.classList.toggle('dark', settings.darkMode);
-    }
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setCurrentView('dashboard');
-  };
-
-  const handleNavigate = (view: string) => {
-    setCurrentView(view);
-  };
-
-  const handleTaskClick = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId);
-    if (task) {
-      setSelectedTask(task);
-      setIsTaskModalOpen(true);
-    }
-  };
-
-  const handleNewTask = (stageId?: string | any) => {
-    const validStageId = typeof stageId === 'string' ? stageId : workflow[0].id;
-    const newTask: Task = {
-        id: `t-${Date.now()}`,
-        title: '',
-        description: '',
-        stage: validStageId,
-        priority: 'MEDIUM' as any,
-        assigneeId: currentUser?.id || '',
-        dueDate: Date.now() + 86400000,
-        client: 'Novo Cliente',
-        tags: [],
-        subtasks: [],
-        attachments: [],
-        comments: [],
-        timeSpent: 0,
-        accepted: false
-    };
-    setSelectedTask(newTask);
-    setIsTaskModalOpen(true);
-  };
-
-  const handleSaveNewTask = async (taskToSave: Task) => {
-      setTasks(prev => [...prev, taskToSave]);
-      addNotification('Tarefa Criada', `A tarefa "${taskToSave.title}" foi criada.`, 'success');
-      setIsTaskModalOpen(false);
-      setSelectedTask(null);
-      await supabase.from('tasks').insert([taskToSave]);
-  };
+  useEffect(() => { fetchAllData(); }, [fetchAllData]);
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
-      if (selectedTask?.id === taskId) {
-          setSelectedTask(prev => prev ? { ...prev, ...updates } : null);
-      }
       await supabase.from('tasks').update(updates).eq('id', taskId);
   };
 
-  const handleAcceptTask = async (taskId: string) => {
-      const targetStage = settings.workflowRules.onAccept || 'design';
-      await handleTaskUpdate(taskId, { accepted: true, stage: targetStage });
-      addNotification('Tarefa Aceita', 'Você aceitou a tarefa.', 'success');
+  const handleUpdateUsers = async (updatedUsers: User[]) => {
+    setUsers(updatedUsers);
+    // Fix: Using sanitizeUserForDb instead of the undefined sanitizeUserDb
+    const dbPayload = updatedUsers.map(sanitizeUserForDb);
+    await supabase.from('users_profiles').upsert(dbPayload, { onConflict: 'id' });
   };
 
-  const handleDeleteTask = async (taskId: string) => {
-      setTasks(prev => prev.filter(t => t.id !== taskId));
-      setIsTaskModalOpen(false);
-      setSelectedTask(null);
-      addNotification('Tarefa Excluída', 'A tarefa foi removida.', 'warning');
-      await supabase.from('tasks').delete().eq('id', taskId);
-  };
-
-  const handleAddComment = (taskId: string, text: string) => {
-      const comment = {
-          id: `c-${Date.now()}`,
-          userId: currentUser?.id || 'unknown',
-          text,
-          timestamp: Date.now()
-      };
-      const task = tasks.find(t => t.id === taskId);
-      if (task) {
-          const updatedComments = [...task.comments, comment];
-          handleTaskUpdate(taskId, { comments: updatedComments });
-      }
-  };
-
-  const handleImportTasks = async (newTasks: Task[]) => {
-      setTasks(prev => [...prev, ...newTasks]);
-      addNotification('Importação Concluída', `${newTasks.length} tarefas importadas.`, 'success');
-      await supabase.from('tasks').insert(newTasks);
-  };
-
-  const handleAddEvent = async (event: CalendarEvent) => {
-      setEvents(prev => [...prev, event]);
-      addNotification('Evento Criado', event.title, 'success');
-      await supabase.from('calendar_events').insert([event]);
-  };
-
-  const handleDeleteEvent = async (id: string) => {
-      setEvents(prev => prev.filter(e => e.id !== id));
-      await supabase.from('calendar_events').delete().eq('id', id);
-  };
-
-  const handleSaveDocument = async (docData: Partial<Document>) => {
-      if (selectedDoc) {
-          const updated = { ...selectedDoc, ...docData, updatedAt: Date.now() };
-          setDocuments(prev => prev.map(d => d.id === selectedDoc.id ? updated : d));
-          await supabase.from('documents').update(updated).eq('id', selectedDoc.id);
-          addNotification('Documento Salvo', 'As alterações foram salvas.', 'success');
-      } else {
-          const newDoc: Document = {
-              id: `d-${Date.now()}`,
-              title: docData.title || 'Sem Título',
-              content: docData.content || '',
-              type: docData.type || 'general',
-              tags: [],
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              authorId: currentUser?.id || 'unknown',
-              ...docData
-          } as Document;
-          setDocuments(prev => [...prev, newDoc]);
-          await supabase.from('documents').insert([newDoc]);
-          addNotification('Documento Criado', 'Novo documento criado.', 'success');
-      }
-      setIsDocEditorOpen(false);
-  };
-
-  const handleDeleteDocument = async (id: string) => {
-      if(confirm('Excluir este documento?')) {
-          setDocuments(prev => prev.filter(d => d.id !== id));
-          await supabase.from('documents').delete().eq('id', id);
-      }
-  };
-
-  const handleUpdateProfile = async (data: Partial<User>) => {
-      if (currentUser) {
-          const updated = { ...currentUser, ...data };
-          setCurrentUser(updated);
-          setUsers(prev => prev.map(u => u.id === currentUser.id ? updated : u));
-          await supabase.from('users_profiles').upsert([updated]);
-          addNotification('Perfil Atualizado', 'Seus dados foram salvos.', 'success');
-      }
-  };
-
-  const handleUpdateSettings = async (newSettings: SystemSettings) => {
-      setSettings(newSettings);
-      document.documentElement.classList.toggle('dark', newSettings.darkMode);
-      await supabase.from('system_settings').upsert([newSettings]);
-      addNotification('Configurações Salvas', 'O sistema foi atualizado.', 'success');
-  };
-
-  const handleUpdateWorkflow = async (newFlow: WorkflowStage[]) => {
-      setWorkflow(newFlow);
-      await supabase.from('workflow_stages').delete().neq('id', 'void');
-      await supabase.from('workflow_stages').insert(newFlow);
+  const resetAndSeedDatabase = async () => {
+    if(!confirm("CUIDADO: Isso apagará todos os dados atuais do Supabase. Deseja prosseguir?")) return;
+    setIsLoading(true);
+    try {
+        await supabase.from('tasks').delete().neq('id', 'void');
+        await supabase.from('users_profiles').delete().neq('id', 'void');
+        const sanitizedSeedUsers = MOCK_USERS.map(sanitizeUserForDb);
+        await supabase.from('users_profiles').insert(sanitizedSeedUsers);
+        await supabase.from('system_settings').upsert([INITIAL_SETTINGS]);
+        alert("Banco inicializado com sucesso!");
+        await fetchAllData();
+    } catch (err) {
+        alert("Erro ao inicializar: " + err);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   if (!currentUser) {
-      return (
-        <Login 
-            users={users} 
-            onLogin={handleLogin} 
-            settings={settings} 
-            onSystemInit={resetAndSeedDatabase} 
-        />
-      );
-  }
-
-  if (isLoading) {
-      return (
-          <div className="h-screen bg-[#0b0e11] flex flex-col items-center justify-center gap-4">
-              <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-gray-400 font-medium animate-pulse">Sincronizando com Supabase...</p>
-          </div>
-      );
+    return <Login users={users} onLogin={setCurrentUser} settings={settings} onSystemInit={resetAndSeedDatabase} />;
   }
 
   return (
     <Layout
         currentUser={currentUser}
         currentView={currentView}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-        onNewTask={handleNewTask}
+        onNavigate={setCurrentView}
+        onLogout={() => setCurrentUser(null)}
+        onNewTask={() => {
+            const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage: workflow[0].id, priority: 'MEDIUM' as any, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Cliente', tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
+            setSelectedTask(newTask); setIsTaskModalOpen(true);
+        }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         settings={settings}
-        onToggleTheme={() => handleUpdateSettings({...settings, darkMode: !settings.darkMode})}
+        onToggleTheme={() => { const updated = {...settings, darkMode: !settings.darkMode}; setSettings(updated); supabase.from('system_settings').upsert([updated]); }}
         notifications={notifications}
-        onNotificationClick={(n) => {
-            setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, read: true } : notif));
-        }}
+        onNotificationClick={(n) => {}}
         onClearNotifications={() => setNotifications([])}
     >
-        {currentView === 'dashboard' && (
-            <Dashboard 
-                tasks={tasks} 
-                workflow={workflow} 
-                themeColor={settings.themeColor}
-                currentUser={currentUser}
-                users={users}
-                notifications={notifications}
-                onUpdateUserStatus={(status) => handleUpdateProfile({ status })}
-                onTaskClick={handleTaskClick}
-                onNavigate={handleNavigate}
-            />
-        )}
+        {currentView === 'dashboard' && <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={async (s) => { const updated = {...currentUser, status: s}; setCurrentUser(updated); await supabase.from('users_profiles').upsert([sanitizeUserForDb(updated)]); }} onNavigate={setCurrentView} />}
+        {currentView === 'crm' && <KanbanBoard tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} onUpdateTask={handleTaskUpdate} onTaskClick={(tid) => { setSelectedTask(tasks.find(t => t.id === tid)!); setIsTaskModalOpen(true); }} onDeleteTask={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); }} onExportTask={() => {}} onNewTask={() => {}} />}
+        {currentView === 'calendar' && <CalendarView events={events} onAddEvent={async (e) => { setEvents(p => [...p, e]); await supabase.from('calendar_events').insert([e]); }} onDeleteEvent={async (id) => { setEvents(p => p.filter(ev => ev.id !== id)); await supabase.from('calendar_events').delete().eq('id', id); }} onViewTask={() => {}} />}
+        {currentView === 'reports' && <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />}
+        {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { setSettings(s); await supabase.from('system_settings').upsert([s]); }} onUpdateUsers={handleUpdateUsers} onUpdateWorkflow={async (w) => { setWorkflow(w); await supabase.from('workflow_stages').delete().neq('id', 'void'); await supabase.from('workflow_stages').insert(w); }} onResetApp={resetAndSeedDatabase} />}
+        {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { setDocuments(p => p.filter(d => d.id !== id)); await supabase.from('documents').delete().eq('id', id); }} themeColor={settings.themeColor} />}
         
-        {currentView === 'crm' && (
-            <KanbanBoard 
-                tasks={tasks}
-                users={users}
-                workflow={workflow}
-                themeColor={settings.themeColor}
-                currentUser={currentUser}
-                onUpdateTask={handleTaskUpdate}
-                onTaskClick={handleTaskClick}
-                onDeleteTask={handleDeleteTask}
-                onExportTask={(id) => console.log('Export', id)}
-                onNewTask={handleNewTask}
-            />
-        )}
-
-        {currentView === 'calendar' && (
-            <CalendarView 
-                events={events}
-                onAddEvent={handleAddEvent}
-                onDeleteEvent={handleDeleteEvent}
-                onViewTask={handleTaskClick}
-            />
-        )}
-
-        {currentView === 'documents' && (
-            <DocumentsView 
-                documents={documents}
-                users={users}
-                onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }}
-                onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }}
-                onDelete={handleDeleteDocument}
-                themeColor={settings.themeColor}
-            />
-        )}
-
-        {currentView === 'approvals' && (
-            <ApprovalCenter 
-                tasks={tasks}
-                onApprove={(tid, aid) => handleTaskUpdate(tid, { attachments: tasks.find(t => t.id === tid)?.attachments.map(a => a.id === aid ? {...a, status: 'approved'} : a) as any })}
-                onReject={(tid, aid, feed) => handleTaskUpdate(tid, { attachments: tasks.find(t => t.id === tid)?.attachments.map(a => a.id === aid ? {...a, status: 'rejected', feedback: feed} : a) as any })}
-            />
-        )}
-
-        {currentView === 'reports' && (
-            <Reports 
-                tasks={tasks}
-                users={users}
-                workflow={workflow}
-                themeColor={settings.themeColor}
-                onTaskClick={handleTaskClick}
-            />
-        )}
-
-        {currentView === 'import' && (
-            <NiftyImportView 
-                users={users}
-                workflow={workflow}
-                themeColor={settings.themeColor}
-                onImportTasks={handleImportTasks}
-                allTasks={tasks}
-            />
-        )}
-
-        {currentView === 'settings' && (
-            <Settings 
-                settings={settings}
-                users={users}
-                workflow={workflow}
-                tasks={tasks}
-                currentUser={currentUser}
-                onUpdateSettings={handleUpdateSettings}
-                onUpdateUsers={setUsers}
-                onUpdateWorkflow={handleUpdateWorkflow}
-                onResetApp={resetAndSeedDatabase}
-            />
-        )}
-
-        <TaskDetailModal 
-            currentUser={currentUser}
-            isOpen={isTaskModalOpen}
-            onClose={() => setIsTaskModalOpen(false)}
-            task={selectedTask}
-            allTasks={tasks}
-            users={users}
-            workflow={workflow}
-            onUpdate={handleTaskUpdate}
-            onCreate={handleSaveNewTask}
-            onAddComment={handleAddComment}
-            onDelete={handleDeleteTask}
-            onDuplicate={(id) => { const t = tasks.find(x => x.id === id); if(t) handleSaveNewTask({...t, id: `t-${Date.now()}`, title: `${t.title} (Cópia)`}); }}
-            onUpload={(tid, file) => console.log('File Upload to tid:', tid, file)}
-            onCloudImport={() => {}}
-            onAccept={handleAcceptTask}
-            onApprove={(tid, aid) => handleTaskUpdate(tid, { attachments: tasks.find(t => t.id === tid)?.attachments.map(a => a.id === aid ? {...a, status: 'approved'} : a) as any })}
-            onReject={(tid, aid, feed) => handleTaskUpdate(tid, { attachments: tasks.find(t => t.id === tid)?.attachments.map(a => a.id === aid ? {...a, status: 'rejected', feedback: feed} : a) as any })}
-            settings={settings}
-        />
-
-        <UserProfileModal 
-            isOpen={isProfileModalOpen}
-            onClose={() => setIsProfileModalOpen(false)}
-            currentUser={currentUser}
-            onUpdateProfile={handleUpdateProfile}
-        />
-
-        <DocumentEditorModal 
-            isOpen={isDocEditorOpen}
-            onClose={() => setIsDocEditorOpen(false)}
-            document={selectedDoc}
-            onSave={handleSaveDocument}
-            themeColor={settings.themeColor}
-            tasks={tasks}
-            users={users}
-            currentUser={currentUser}
-        />
-
-        <div className="fixed bottom-4 right-4 z-[90] flex flex-col gap-2 pointer-events-none">
-            {notifications.filter(n => !n.read).slice(0, 3).map(n => (
-                <NotificationToast 
-                    key={n.id} 
-                    notification={n} 
-                    onClose={() => setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, read: true } : notif))}
-                    onClick={() => setNotifications(prev => prev.map(notif => notif.id === n.id ? { ...notif, read: true } : notif))}
-                />
-            ))}
-        </div>
+        <TaskDetailModal currentUser={currentUser} isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} task={selectedTask} allTasks={tasks} users={users} workflow={workflow} onUpdate={handleTaskUpdate} onCreate={async (t) => { setTasks(p => [...p, t]); await supabase.from('tasks').insert([t]); setIsTaskModalOpen(false); }} onAddComment={(tid, text) => handleTaskUpdate(tid, { comments: [...tasks.find(t => t.id === tid)!.comments, { id: Date.now().toString(), userId: currentUser.id, text, timestamp: Date.now() }] })} onDelete={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); setIsTaskModalOpen(false); }} onDuplicate={() => {}} onUpload={() => {}} onCloudImport={() => {}} onAccept={(tid) => handleTaskUpdate(tid, { accepted: true, stage: settings.workflowRules.onAccept })} onApprove={() => {}} onReject={() => {}} settings={settings} />
+        <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} currentUser={currentUser} onUpdateProfile={async (up) => { const updated = {...currentUser, ...up}; setCurrentUser(updated); await supabase.from('users_profiles').upsert([sanitizeUserForDb(updated)]); }} />
+        <DocumentEditorModal isOpen={isDocEditorOpen} onClose={() => setIsDocEditorOpen(false)} document={selectedDoc} onSave={async (doc) => { if(selectedDoc) { const updated = {...selectedDoc, ...doc, updatedAt: Date.now()}; setDocuments(p => p.map(d => d.id === updated.id ? updated : d)); await supabase.from('documents').update(updated).eq('id', updated.id); } else { const newDoc = {id: Date.now().toString(), createdAt: Date.now(), updatedAt: Date.now(), authorId: currentUser.id, ...doc} as Document; setDocuments(p => [...p, newDoc]); await supabase.from('documents').insert([newDoc]); } }} themeColor={settings.themeColor} tasks={tasks} users={users} currentUser={currentUser} />
     </Layout>
   );
 };

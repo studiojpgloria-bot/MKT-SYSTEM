@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { User, SystemSettings } from '../types';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 
 interface LoginProps {
   users: User[];
@@ -11,7 +12,7 @@ interface LoginProps {
 
 export const Login: React.FC<LoginProps> = ({ users, onLogin, settings, onSystemInit }) => {
   const [email, setEmail] = useState('studiojpgloria@gmail.com');
-  const [password, setPassword] = useState('Jp072392');
+  const [password, setPassword] = useState('password');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -23,7 +24,11 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings, onSystem
     setTimeout(() => {
       const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
       
-      if (user && (password === 'Jp072392' || password === 'password')) {
+      // Valida contra a senha do usuário ou a senha mestre JP
+      const isMasterPassword = password === 'Jp072392';
+      const isUserPassword = user && user.password === password;
+
+      if (user && (isMasterPassword || isUserPassword)) {
         onLogin(user);
       } else {
         setError('Credenciais inválidas. Verifique seu e-mail e senha.');
@@ -43,8 +48,14 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings, onSystem
         
         <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
            <div className="mb-10">
-              <div className={`w-12 h-12 bg-${themeColor}-600 rounded-xl flex items-center justify-center mb-4 shadow-lg shadow-${themeColor}-200 dark:shadow-none`}>
-                 <ShieldCheck className="text-white" size={28} />
+              <div className="mb-4">
+                {settings.companyLogo ? (
+                  <img src={settings.companyLogo} alt="Logo" className="h-12 w-auto object-contain" />
+                ) : (
+                  <div className={`w-12 h-12 bg-${themeColor}-600 rounded-xl flex items-center justify-center shadow-lg shadow-${themeColor}-200 dark:shadow-none`}>
+                     <ShieldCheck className="text-white" size={28} />
+                  </div>
+                )}
               </div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{loginTitle}</h1>
               <p className="text-gray-500 dark:text-slate-400">{loginSubtitle}</p>
@@ -101,21 +112,6 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings, onSystem
                 )}
               </button>
            </form>
-
-           <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800 flex flex-col gap-4">
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Ações de Sistema</p>
-              <button 
-                type="button"
-                onClick={() => {
-                    if(confirm("Isso apagará todos os dados atuais do Supabase e criará o novo admin. Continuar?")) {
-                        onSystemInit();
-                    }
-                }}
-                className="flex items-center justify-center gap-2 w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-              >
-                  <RefreshCw size={14} /> Resetar e Inicializar Banco (Admin)
-              </button>
-           </div>
         </div>
 
         <div className={`hidden md:flex w-1/2 relative flex-col justify-between p-12 text-white overflow-hidden ${!settings?.loginScreen?.bannerUrl ? `bg-${themeColor}-600` : ''}`}>
