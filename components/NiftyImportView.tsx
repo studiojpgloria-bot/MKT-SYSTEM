@@ -417,7 +417,7 @@ export const NiftyImportView: React.FC<NiftyImportViewProps> = ({ users, workflo
                     <div className="w-full max-w-md bg-[#0b0e11] rounded-2xl border border-[#2a303c] p-4 h-32 overflow-y-auto custom-scrollbar text-left font-mono text-[10px] text-blue-400/70">
                         {items.filter(i => i.status !== 'pending').map((item, idx) => (
                             <div key={idx} className="mb-1">
-                                [LOG] {item.status.toUpperCase()} -> {item.actionTaken || 'Tarefa processada'} : {item.row["Task Name"]}
+                                {`[LOG] ${item.status.toUpperCase()} -> ${item.actionTaken || 'Tarefa processada'} : ${item.row["Task Name"]}`}
                             </div>
                         ))}
                     </div>
