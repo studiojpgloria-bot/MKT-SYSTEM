@@ -1,6 +1,5 @@
-
-import React, { useState, useEffect } from 'react';
-import { FileText, Check, X, Eye, Download, MessageSquare, Play, Film, Plus, Trash2, Clock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Check, X, Eye, Download, MessageSquare, Play, Film, Plus, Trash2, Clock, Pause, Circle } from 'lucide-react';
 import { Task, TaskStage, Attachment } from '../types';
 
 interface ApprovalCenterProps {
@@ -20,6 +19,13 @@ export const ApprovalCenter: React.FC<ApprovalCenterProps> = ({ tasks, onApprove
   // Feedback state for image modal
   const [imageFeedback, setImageFeedback] = useState('');
 
+  // Video Player State
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
   // Reset states when opening a file
   useEffect(() => {
       if (selectedFile) {
@@ -27,6 +33,10 @@ export const ApprovalCenter: React.FC<ApprovalCenterProps> = ({ tasks, onApprove
           setVideoFeedback('');
           setFeedbackList([]);
           setImageFeedback('');
+          setIsPlaying(false);
+          setProgress(0);
+          setDuration(0);
+          setCurrentTime(0);
       }
   }, [selectedFile]);
 
@@ -57,9 +67,9 @@ export const ApprovalCenter: React.FC<ApprovalCenterProps> = ({ tasks, onApprove
   const handleAddVideoFeedback = () => {
       if (videoFeedback.trim()) {
           setFeedbackList([...feedbackList, { 
-              time: videoTimestamp || '00:00', 
+              time: videoTimestamp || formatTime(currentTime), 
               note: videoFeedback 
-          }]);
+          }].sort((a, b) => parseTime(a.time) - parseTime(b.time)));
           setVideoFeedback('');
           setVideoTimestamp('');
       }
@@ -91,6 +101,83 @@ export const ApprovalCenter: React.FC<ApprovalCenterProps> = ({ tasks, onApprove
             
           onReject(selectedFile.task.id, selectedFile.attachment.id, finalFeedback);
           setSelectedFile(null);
+      }
+  };
+
+  // --- Video Player Helpers ---
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const parseTime = (timeStr: string) => {
+    const parts = timeStr.split(':').map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return 0;
+  };
+
+  const togglePlay = async () => {
+    if (videoRef.current) {
+        try {
+            if (isPlaying) {
+                videoRef.current.pause();
+            } else {
+                await videoRef.current.play();
+            }
+            setIsPlaying(!isPlaying);
+        } catch (error) {
+            console.error("Video play error:", error);
+            setIsPlaying(false);
+        }
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+        const curr = videoRef.current.currentTime;
+        const dur = videoRef.current.duration;
+        setCurrentTime(curr);
+        
+        if (isFinite(dur) && dur > 0) {
+            setProgress((curr / dur) * 100);
+        } else {
+            setProgress(0);
+        }
+        
+        if (curr === dur) setIsPlaying(false);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+      if (videoRef.current) {
+          setDuration(videoRef.current.duration);
+      }
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!videoRef.current) return;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const percentage = Math.min(Math.max(0, x / rect.width), 1);
+      
+      const dur = videoRef.current.duration;
+      if (!isFinite(dur)) return;
+
+      const newTime = percentage * dur;
+      
+      videoRef.current.currentTime = newTime;
+      setProgress(percentage * 100);
+      setCurrentTime(newTime);
+  };
+
+  const jumpToTime = (timeStr: string) => {
+      const seconds = parseTime(timeStr);
+      if (videoRef.current && isFinite(videoRef.current.duration)) {
+          videoRef.current.currentTime = seconds;
+          setCurrentTime(seconds);
       }
   };
 
@@ -198,140 +285,213 @@ export const ApprovalCenter: React.FC<ApprovalCenterProps> = ({ tasks, onApprove
       {/* Media Viewer Modal */}
       {selectedFile && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 overflow-y-auto">
-            <div className="relative w-full max-w-5xl flex flex-col bg-white dark:bg-slate-900 rounded-xl overflow-hidden shadow-2xl my-8">
+            <div className="relative w-full max-w-6xl flex flex-col lg:flex-row bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-2xl my-8 h-[85vh]">
                 <button 
                     onClick={() => setSelectedFile(null)}
-                    className="absolute top-2 right-2 z-10 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
+                    className="absolute top-4 right-4 z-20 p-2 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"
                 >
                     <X size={24} />
                 </button>
                 
-                {/* Media Display Area */}
-                <div className="bg-black flex items-center justify-center" style={{ minHeight: '400px', maxHeight: '60vh' }}>
+                {/* Media Display Area (Left/Top) */}
+                <div className="bg-black flex items-center justify-center relative flex-1 h-1/2 lg:h-full lg:w-2/3 border-r border-gray-800">
                     {selectedFile.attachment.type === 'image' ? (
                         <img 
                             src={selectedFile.attachment.url} 
                             alt="Preview" 
-                            className="max-w-full max-h-[60vh] object-contain" 
+                            className="max-w-full max-h-full object-contain" 
                         />
                     ) : (
-                         <video 
-                            controls 
-                            className="max-w-full max-h-[60vh] w-full"
-                            src={selectedFile.attachment.url}
-                         >
-                            Seu navegador não suporta a tag de vídeo.
-                         </video>
+                        // Custom Video Player
+                        <div className="w-full h-full flex flex-col justify-center bg-black relative group">
+                             <video 
+                                ref={videoRef}
+                                className="max-w-full max-h-full w-full object-contain"
+                                src={selectedFile.attachment.url}
+                                onClick={togglePlay}
+                                onTimeUpdate={handleTimeUpdate}
+                                onLoadedMetadata={handleLoadedMetadata}
+                             >
+                                Seu navegador não suporta a tag de vídeo.
+                             </video>
+                             
+                             {/* Center Play Button Overlay */}
+                             {!isPlaying && (
+                                <div 
+                                    className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer"
+                                    onClick={togglePlay}
+                                >
+                                    <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/30 transition-all">
+                                        <Play size={32} fill="white" />
+                                    </div>
+                                </div>
+                             )}
+
+                             {/* Bottom Controls */}
+                             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300 opacity-0 group-hover:opacity-100 flex flex-col gap-2">
+                                 
+                                 {/* Progress Bar with Markers */}
+                                 <div 
+                                    className="relative w-full h-1.5 bg-gray-600 rounded-full cursor-pointer group/timeline hover:h-2.5 transition-all"
+                                    onClick={handleSeek}
+                                 >
+                                     <div 
+                                        className="absolute top-0 left-0 h-full bg-indigo-500 rounded-full" 
+                                        style={{ width: `${progress}%` }}
+                                     ></div>
+                                     
+                                     {/* Markers */}
+                                     {feedbackList.map((fb, idx) => {
+                                         const fbSecs = parseTime(fb.time);
+                                         const fbPct = (duration > 0 && isFinite(duration)) ? (fbSecs / duration) * 100 : 0;
+                                         return (
+                                             <div 
+                                                key={idx}
+                                                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-yellow-400 rounded-full border-2 border-black hover:scale-125 transition-transform z-10"
+                                                style={{ left: `${fbPct}%` }}
+                                                title={`${fb.time}: ${fb.note}`}
+                                             />
+                                         );
+                                     })}
+                                 </div>
+
+                                 {/* Control Buttons */}
+                                 <div className="flex items-center justify-between text-white text-xs font-medium">
+                                     <div className="flex items-center gap-4">
+                                         <button onClick={togglePlay} className="hover:text-indigo-400">
+                                             {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+                                         </button>
+                                         <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
+                                     </div>
+                                 </div>
+                             </div>
+                        </div>
                     )}
                 </div>
 
-                {/* Controls Area */}
-                <div className="p-6 flex flex-col md:flex-row gap-6">
-                    
-                    {/* Feedback Section */}
-                    <div className="flex-1">
-                        <h4 className="font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
-                            <MessageSquare size={18} className="text-indigo-500"/> 
+                {/* Controls Area (Right/Bottom) */}
+                <div className="flex-1 lg:max-w-md bg-white dark:bg-[#151a21] flex flex-col h-1/2 lg:h-full border-t lg:border-t-0 border-gray-200 dark:border-slate-800">
+                    <div className="p-6 flex-1 overflow-y-auto">
+                        <h4 className="font-bold text-gray-800 dark:text-white mb-6 flex items-center gap-2 text-lg">
+                            <MessageSquare size={20} className="text-indigo-500"/> 
                             Feedback & Correções
                         </h4>
 
                         {selectedFile.attachment.type === 'video' ? (
-                            <div className="space-y-4">
-                                {/* List of added feedback */}
-                                {feedbackList.length > 0 && (
-                                    <div className="bg-gray-50 dark:bg-slate-800 rounded-lg p-3 max-h-40 overflow-y-auto border border-gray-200 dark:border-slate-700 space-y-2">
-                                        {feedbackList.map((item, idx) => (
-                                            <div key={idx} className="flex justify-between items-start text-sm bg-white dark:bg-slate-700 p-2 rounded shadow-sm">
-                                                <div>
-                                                    <span className="font-mono font-bold text-indigo-600 text-xs bg-indigo-50 dark:bg-indigo-900/50 px-1 rounded mr-2">{item.time}</span>
-                                                    <span className="text-gray-700 dark:text-slate-200">{item.note}</span>
+                            <div className="space-y-6">
+                                {/* Feedback List */}
+                                <div className="space-y-2">
+                                    {feedbackList.length === 0 ? (
+                                        <div className="text-center py-8 text-gray-500 text-sm border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-xl">
+                                            Sem correções adicionadas.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {feedbackList.map((item, idx) => (
+                                                <div 
+                                                    key={idx} 
+                                                    onClick={() => jumpToTime(item.time)}
+                                                    className="flex justify-between items-center text-sm bg-gray-100 dark:bg-[#1e232d] p-3 rounded-xl border border-transparent hover:border-indigo-500/50 cursor-pointer group transition-all"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="font-mono font-bold text-indigo-400 text-xs bg-indigo-500/10 px-2 py-1 rounded-md">{item.time}</span>
+                                                        <span className="text-gray-700 dark:text-slate-200 line-clamp-1 font-medium">{item.note}</span>
+                                                    </div>
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRemoveFeedbackItem(idx);
+                                                        }} 
+                                                        className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
                                                 </div>
-                                                <button onClick={() => handleRemoveFeedbackItem(idx)} className="text-gray-400 hover:text-red-500">
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
 
                                 {/* Inputs */}
-                                <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-                                    <div className="col-span-1">
-                                        <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Minutagem</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="00:00" 
-                                            value={videoTimestamp}
-                                            onChange={(e) => setVideoTimestamp(e.target.value)}
-                                            className="w-full p-2 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded font-mono text-sm"
-                                        />
+                                <div className="bg-gray-50 dark:bg-[#0b0e11] p-4 rounded-xl border border-gray-200 dark:border-slate-800 space-y-3">
+                                    <div className="flex gap-3">
+                                        <div className="w-24">
+                                            <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase mb-1.5">Minutagem</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="00:00" 
+                                                value={videoTimestamp}
+                                                onChange={(e) => setVideoTimestamp(e.target.value)}
+                                                className="w-full p-2.5 bg-white dark:bg-[#151a21] border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white rounded-lg font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                            />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="block text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase mb-1.5">Descrição da Alteração</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Descreva o ajuste..." 
+                                                value={videoFeedback}
+                                                onChange={(e) => setVideoFeedback(e.target.value)}
+                                                className="w-full p-2.5 bg-white dark:bg-[#151a21] border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                                onKeyDown={(e) => e.key === 'Enter' && handleAddVideoFeedback()}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="col-span-3">
-                                        <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Descrição da Alteração</label>
-                                        <input 
-                                            type="text" 
-                                            placeholder="Ex: Cortar esta cena, mudar cor do texto..." 
-                                            value={videoFeedback}
-                                            onChange={(e) => setVideoFeedback(e.target.value)}
-                                            className="w-full p-2 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded text-sm"
-                                            onKeyDown={(e) => e.key === 'Enter' && handleAddVideoFeedback()}
-                                        />
-                                    </div>
-                                    <div className="col-span-1 flex items-end">
-                                        <button 
-                                            onClick={handleAddVideoFeedback}
-                                            disabled={!videoFeedback}
-                                            className="w-full p-2 bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-slate-200 hover:bg-indigo-100 hover:text-indigo-700 font-bold rounded transition-colors text-sm flex items-center justify-center gap-1 disabled:opacity-50"
-                                        >
-                                            <Plus size={16}/> Add
-                                        </button>
-                                    </div>
+                                    <button 
+                                        onClick={handleAddVideoFeedback}
+                                        disabled={!videoFeedback}
+                                        className="w-full py-2.5 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition-colors text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-indigo-500/20"
+                                    >
+                                        <Plus size={16}/> Adicionar Correção
+                                    </button>
                                 </div>
                             </div>
                         ) : (
                             // Image Feedback
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1">Descrição das Alterações</label>
+                                <label className="block text-xs font-bold text-gray-500 dark:text-slate-400 uppercase mb-1.5">Descrição das Alterações</label>
                                 <textarea
                                     rows={4}
                                     placeholder="Descreva o que precisa ser ajustado nesta imagem..."
                                     value={imageFeedback}
                                     onChange={(e) => setImageFeedback(e.target.value)}
-                                    className="w-full p-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm resize-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full p-3 bg-white dark:bg-[#0b0e11] border border-gray-200 dark:border-slate-700 text-gray-900 dark:text-white rounded-xl text-sm resize-none focus:ring-2 focus:ring-indigo-500"
                                 />
                             </div>
                         )}
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="w-full md:w-64 flex flex-col justify-end gap-3 border-t md:border-t-0 md:border-l border-gray-100 dark:border-slate-700 pt-4 md:pt-0 md:pl-6">
-                        <div className="text-xs text-gray-500 dark:text-slate-400 mb-2">
-                            Ações:
+                    <div className="p-6 bg-gray-50 dark:bg-[#0b0e11] border-t border-gray-200 dark:border-slate-800 flex flex-col gap-3">
+                        <div className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                            Ações Finais
                         </div>
-                        <button 
-                            onClick={handleSubmitRejection}
-                            className="w-full py-3 px-4 bg-white dark:bg-slate-800 text-red-600 border border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-900/20 font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
-                        >
-                            <X size={18} /> Solicitar Alteração
-                        </button>
-                        <button 
-                            onClick={() => {
-                                onApprove(selectedFile.task.id, selectedFile.attachment.id);
-                                setSelectedFile(null);
-                            }}
-                            className="w-full py-3 px-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-lg shadow-green-200 dark:shadow-none transition-all flex items-center justify-center gap-2"
-                        >
-                            <Check size={18} /> Aprovar Ativo
-                        </button>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={handleSubmitRejection}
+                                className="flex-1 py-3 px-4 bg-white dark:bg-[#151a21] text-red-500 border border-red-200 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/10 font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
+                            >
+                                <X size={18} /> Solicitar Alteração
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    onApprove(selectedFile.task.id, selectedFile.attachment.id);
+                                    setSelectedFile(null);
+                                }}
+                                className="flex-1 py-3 px-4 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 shadow-lg shadow-green-500/20 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Check size={18} /> Aprovar Ativo
+                            </button>
+                        </div>
                         
                         {selectedFile.attachment.type === 'video' && (
-                            <p className="text-[10px] text-center text-gray-400 mt-2">
-                                Ao solicitar alteração, todas as notas adicionadas serão enviadas ao editor.
+                            <p className="text-[10px] text-center text-gray-400 mt-1">
+                                Ao solicitar alteração, todas as notas serão enviadas ao editor.
                             </p>
                         )}
                     </div>
-
                 </div>
+
             </div>
         </div>
       )}

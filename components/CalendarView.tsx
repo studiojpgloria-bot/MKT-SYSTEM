@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Video, Link as LinkIcon, MapPin, Plus, ExternalLink, Trash2, X } from 'lucide-react';
 import { CalendarEvent } from '../types';
 
@@ -7,9 +7,10 @@ interface CalendarViewProps {
   events: CalendarEvent[];
   onAddEvent: (event: CalendarEvent) => void;
   onDeleteEvent: (id: string) => void;
+  onViewTask: (taskId: string) => void;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, onDeleteEvent }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, onDeleteEvent, onViewTask }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   
   // Modals State
@@ -23,16 +24,52 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
   const [newEventPlatform, setNewEventPlatform] = useState<'Google Meet' | 'Zoom' | 'Teams'>('Google Meet');
   const [newEventDesc, setNewEventDesc] = useState('');
 
+  // Refs for Scroll/Swipe Logic
+  const lastNavTime = useRef(0);
+  const touchStart = useRef<{x: number, y: number} | null>(null);
+
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
   
-  const monthName = currentDate.toLocaleString('default', { month: 'long' });
+  const monthName = currentDate.toLocaleString('pt-BR', { month: 'long' });
   const year = currentDate.getFullYear();
 
   // --- Navigation Handlers ---
   const prevMonth = () => setCurrentDate(new Date(year, currentDate.getMonth() - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, currentDate.getMonth() + 1, 1));
   const goToToday = () => setCurrentDate(new Date());
+
+  // --- Scroll & Swipe Logic ---
+  const handleWheel = (e: React.WheelEvent) => {
+    // Detect mostly horizontal scroll
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) && Math.abs(e.deltaX) > 20) {
+      const now = Date.now();
+      // Throttle navigation to prevent skipping multiple months instantly
+      if (now - lastNavTime.current > 500) { 
+        if (e.deltaX > 0) nextMonth();
+        else prevMonth();
+        lastNavTime.current = now;
+      }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (!touchStart.current) return;
+    
+    const diffX = touchStart.current.x - e.changedTouches[0].clientX;
+    const diffY = touchStart.current.y - e.changedTouches[0].clientY;
+
+    // Check if horizontal swipe is dominant and long enough
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+        if (diffX > 0) nextMonth(); // Swiped Left -> Go Next
+        else prevMonth(); // Swiped Right -> Go Prev
+    }
+    touchStart.current = null;
+  };
 
   // --- Event Handlers ---
   const handleDayClick = (day: number) => {
@@ -69,7 +106,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
   };
 
   const handleDelete = () => {
-      if(selectedEvent && confirm('Are you sure you want to delete this event?')) {
+      if(selectedEvent && confirm('Tem certeza de que deseja excluir este evento?')) {
           onDeleteEvent(selectedEvent.id);
           setSelectedEvent(null);
       }
@@ -132,7 +169,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
                 >
                     <div className="font-semibold truncate">{event.title}</div>
                     {event.type === 'meeting' && <div className="text-[10px] opacity-75 flex items-center gap-1"><Video size={8}/> {new Date(event.start).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>}
-                    {event.type === 'deadline' && <div className="text-[10px] opacity-75 flex items-center gap-1"><Clock size={8}/> Due Date</div>}
+                    {event.type === 'deadline' && <div className="text-[10px] opacity-75 flex items-center gap-1"><Clock size={8}/> Entrega</div>}
                 </div>
             ))}
           </div>
@@ -148,17 +185,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-slate-800">
         <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2 capitalize">
                 <CalendarIcon className="text-indigo-600" />
                 {monthName} {year}
             </h2>
+            <p className="text-xs text-gray-400 mt-1 hidden sm:block">Role horizontalmente ou deslize para navegar entre os meses</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={prevMonth} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 transition-colors">
             <ChevronLeft size={20} className="text-gray-600 dark:text-slate-300" />
           </button>
           <button onClick={goToToday} className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg text-sm font-medium text-gray-600 dark:text-slate-300 border border-gray-200 dark:border-slate-700 transition-colors">
-            Today
+            Hoje
           </button>
           <button onClick={nextMonth} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg border border-gray-200 dark:border-slate-700 transition-colors">
             <ChevronRight size={20} className="text-gray-600 dark:text-slate-300" />
@@ -168,15 +206,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
 
       {/* Week Days Header */}
       <div className="grid grid-cols-7 border-b border-gray-200 dark:border-slate-800 bg-gray-50 dark:bg-slate-950">
-        {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+        {['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'].map(day => (
           <div key={day} className="py-3 text-center text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">
             {day.slice(0, 3)}
           </div>
         ))}
       </div>
 
-      {/* Calendar Grid */}
-      <div className="grid grid-cols-7 flex-1 overflow-y-auto bg-white dark:bg-slate-900">
+      {/* Calendar Grid with Scroll Listeners */}
+      <div 
+        className="grid grid-cols-7 flex-1 overflow-y-auto bg-white dark:bg-slate-900 touch-pan-y"
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         {renderDays()}
       </div>
 
@@ -208,9 +251,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
                                   <Clock size={20} />
                               </div>
                               <div>
-                                  <p className="text-sm font-bold text-gray-900 dark:text-white">Date & Time</p>
+                                  <p className="text-sm font-bold text-gray-900 dark:text-white">Data e Hora</p>
                                   <p className="text-sm text-gray-500 dark:text-slate-400">
-                                      {new Date(selectedEvent.start).toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'})}
+                                      {new Date(selectedEvent.start).toLocaleDateString('pt-BR', {weekday: 'long', month: 'long', day: 'numeric'})}
                                       <br/>
                                       {new Date(selectedEvent.start).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} - {new Date(selectedEvent.end).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
                                   </p>
@@ -223,7 +266,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
                                       <ExternalLink size={20} />
                                   </div>
                                   <div>
-                                      <p className="text-sm font-bold text-gray-900 dark:text-white">Description</p>
+                                      <p className="text-sm font-bold text-gray-900 dark:text-white">Descrição</p>
                                       <p className="text-sm text-gray-500 dark:text-slate-400 leading-relaxed">{selectedEvent.description}</p>
                                   </div>
                               </div>
@@ -235,7 +278,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
                                       <MapPin size={20} />
                                   </div>
                                   <div>
-                                      <p className="text-sm font-bold text-gray-900 dark:text-white">Platform</p>
+                                      <p className="text-sm font-bold text-gray-900 dark:text-white">Plataforma</p>
                                       <p className="text-sm text-gray-500 dark:text-slate-400">{selectedEvent.platform || 'Online Meeting'}</p>
                                   </div>
                               </div>
@@ -251,13 +294,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
                                 rel="noreferrer"
                                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-blue-200 dark:shadow-none"
                               >
-                                  <Video size={18} /> Join Meeting
+                                  <Video size={18} /> Entrar na Reunião
                               </a>
                           )}
                           
                           {selectedEvent.type === 'deadline' && (
-                              <button className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none">
-                                  <ExternalLink size={18} /> View Task
+                              <button 
+                                onClick={() => {
+                                    if (selectedEvent.taskId) {
+                                        onViewTask(selectedEvent.taskId);
+                                        setSelectedEvent(null);
+                                    }
+                                }}
+                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg shadow-indigo-200 dark:shadow-none"
+                              >
+                                  <ExternalLink size={18} /> Ver Tarefa
                               </button>
                           )}
 
@@ -278,13 +329,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
           <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
               <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-800 overflow-hidden">
                   <div className="p-5 border-b border-gray-100 dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-950">
-                      <h3 className="font-bold text-gray-900 dark:text-white">Add New Event</h3>
+                      <h3 className="font-bold text-gray-900 dark:text-white">Adicionar Novo Evento</h3>
                       <button onClick={() => setIsCreateOpen(false)}><X size={20} className="text-gray-500"/></button>
                   </div>
                   
                   <form onSubmit={handleCreateEvent} className="p-6 space-y-4">
                       <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Event Title</label>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Título do Evento</label>
                           <input 
                             type="text" 
                             autoFocus
@@ -292,34 +343,34 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
                             value={newEventTitle}
                             onChange={(e) => setNewEventTitle(e.target.value)}
                             className="w-full p-3 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500"
-                            placeholder="e.g. Client Sync" 
+                            placeholder="ex: Reunião de Sincronização" 
                           />
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
+                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Data</label>
                               <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded-lg text-sm font-medium text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700">
-                                  {newEventDate.toLocaleDateString()}
+                                  {newEventDate.toLocaleDateString('pt-BR')}
                               </div>
                           </div>
                           <div>
-                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Type</label>
+                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo</label>
                               <select 
                                 value={newEventType}
                                 onChange={(e) => setNewEventType(e.target.value as any)}
                                 className="w-full p-3 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm"
                               >
-                                  <option value="meeting">Meeting</option>
-                                  <option value="deadline">Deadline</option>
-                                  <option value="campaign">Campaign</option>
+                                  <option value="meeting">Reunião</option>
+                                  <option value="deadline">Entrega</option>
+                                  <option value="campaign">Campanha</option>
                               </select>
                           </div>
                       </div>
 
                       {newEventType === 'meeting' && (
                            <div>
-                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Platform</label>
+                              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Plataforma</label>
                               <select 
                                 value={newEventPlatform}
                                 onChange={(e) => setNewEventPlatform(e.target.value as any)}
@@ -330,19 +381,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
                                   <option value="Teams">Microsoft Teams</option>
                               </select>
                               <p className="text-xs text-blue-500 mt-1 flex items-center gap-1">
-                                  <LinkIcon size={10} /> A meeting link will be generated automatically.
+                                  <LinkIcon size={10} /> Um link será gerado automaticamente.
                               </p>
                            </div>
                       )}
 
                       <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Description (Optional)</label>
+                          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Descrição (Opcional)</label>
                           <textarea 
                              value={newEventDesc}
                              onChange={(e) => setNewEventDesc(e.target.value)}
                              className="w-full p-3 border border-gray-200 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg text-sm resize-none"
                              rows={3}
-                             placeholder="Add details..."
+                             placeholder="Adicione detalhes..."
                           />
                       </div>
 
@@ -352,7 +403,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, onAddEvent, 
                             disabled={!newEventTitle}
                             className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                              Create Event
+                              Criar Evento
                           </button>
                       </div>
                   </form>

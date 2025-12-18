@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   MANAGER = 'MANAGER',
@@ -26,6 +27,13 @@ export interface WorkflowStage {
   color: string; // hex or tailwind color name
 }
 
+export interface WorkflowRules {
+  onAccept: string;         // Stage to move to when task is accepted
+  onDeliverableUpload: string; // Stage to move to when deliverable is uploaded (Review/Lock state)
+  onApprove: string;        // Stage to move to when approved
+  onReject: string;         // Stage to move to when rejected
+}
+
 export interface SystemSettings {
   companyName: string;
   companyLogo: string; // URL
@@ -45,6 +53,7 @@ export interface SystemSettings {
     subtitle: string;
     bannerUrl: string;
   };
+  workflowRules: WorkflowRules;
 }
 
 export interface User {
@@ -55,12 +64,6 @@ export interface User {
   email: string;
   status: 'online' | 'paused' | 'offline';
   lastSeen: number;
-}
-
-export interface Client {
-  id: string;
-  name: string;
-  logo_url?: string;
 }
 
 export interface Comment {
@@ -78,11 +81,14 @@ export interface Subtask {
 
 export interface Notification {
   id: string;
+  userId: string; // Recipient ID
   title: string;
   message: string;
   type: 'success' | 'error' | 'info' | 'warning';
   read: boolean;
   timestamp: number;
+  resourceId?: string; // ID of the task or document
+  resourceType?: 'task' | 'document'; // Type of resource to open
 }
 
 export interface Attachment {
@@ -103,18 +109,15 @@ export interface Task {
   description: string;
   stage: string; // Changed from Enum to string to support dynamic stages
   priority: TaskPriority;
-  creator_id: string;
   assigneeId: string;
-  clientId: string | null;
   dueDate: number;
-  createdAt: number;
+  client: string;
   tags: string[];
   subtasks: Subtask[];
   attachments: Attachment[];
   comments: Comment[];
   timeSpent: number; // in minutes
   accepted: boolean;
-  clients?: Client; // For joined data
 }
 
 export interface CalendarEvent {
@@ -135,4 +138,43 @@ export interface DashboardMetrics {
   approvalRate: number;
   completedThisMonth: number;
   avgProductionTime: number; // in minutes
+}
+
+export interface Document {
+  id: string;
+  title: string;
+  content: string; // HTML Content
+  type: 'meeting' | 'project' | 'briefing' | 'general';
+  tags: string[];
+  createdAt: number;
+  updatedAt: number;
+  authorId: string;
+  coverImage?: string;
+  emoji?: string;
+  linkedTaskId?: string;
+  sharedWith?: string[]; // Array of User IDs allowed to view/edit
+}
+
+export interface MindMapNode {
+  id: string;
+  type: 'node' | 'root' | 'note' | 'text' | 'shape' | 'sticker' | 'comment';
+  label: string; // Text content or emoji char
+  x: number;
+  y: number;
+  parentId: string | null;
+  color: string;
+  image?: string;
+  width?: number;
+  height?: number;
+  shapeType?: 'rectangle' | 'circle' | 'diamond' | 'triangle'; // For type: 'shape'
+}
+
+export interface MindMapDocument {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  authorId: string;
+  nodes: MindMapNode[];
+  thumbnailColor: string; // For the card UI
 }

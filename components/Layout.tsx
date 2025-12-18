@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, User as UserIcon, Briefcase } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, Moon, Sun, Search, FileText, Network, UploadCloud } from 'lucide-react';
 import { User, UserRole, SystemSettings, Notification } from '../types';
 
 interface LayoutProps {
@@ -8,10 +9,11 @@ interface LayoutProps {
   onNavigate: (view: string) => void;
   onLogout: () => void;
   onNewTask: () => void;
+  onOpenProfile: () => void;
   settings: SystemSettings;
-  onToggleTheme: () => void; // Kept for compatibility but will be a no-op
+  onToggleTheme: () => void;
   notifications: Notification[];
-  onMarkRead: (id: string) => void;
+  onNotificationClick: (notification: Notification) => void;
   onClearNotifications: () => void;
   children: React.ReactNode;
 }
@@ -22,30 +24,25 @@ export const Layout: React.FC<LayoutProps> = ({
   onNavigate, 
   onLogout, 
   onNewTask, 
+  onOpenProfile,
   settings, 
   onToggleTheme,
   notifications,
-  onMarkRead,
+  onNotificationClick,
   onClearNotifications,
   children 
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-  const profileMenuRef = useRef<HTMLDivElement>(null);
   const themeColor = settings.themeColor;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
         setIsNotifOpen(false);
-      }
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
-        setIsProfileMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -55,197 +52,169 @@ export const Layout: React.FC<LayoutProps> = ({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
     { id: 'crm', label: 'CRM Kanban', icon: Kanban, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
-    { id: 'calendar', label: 'Calendar', icon: CalendarIcon, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
-    { id: 'clients', label: 'Clients', icon: Briefcase, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-    { id: 'approvals', label: 'Approvals', icon: CheckCircle, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-    { id: 'reports', label: 'Reports', icon: FileBarChart, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-    { id: 'settings', label: 'Settings', icon: Settings, roles: [UserRole.ADMIN] },
+    { id: 'calendar', label: 'Calendário', icon: CalendarIcon, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
+    { id: 'documents', label: 'Documentos', icon: FileText, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
+    { id: 'approvals', label: 'Aprovações', icon: CheckCircle, roles: [UserRole.ADMIN, UserRole.MANAGER] },
+    { id: 'reports', label: 'Relatórios', icon: FileBarChart, roles: [UserRole.ADMIN, UserRole.MANAGER] },
+    { id: 'import', label: 'Importar Nifty', icon: UploadCloud, roles: [UserRole.ADMIN, UserRole.MANAGER] },
+    { id: 'settings', label: 'Configurações', icon: Settings, roles: [UserRole.ADMIN] },
   ];
 
-  // Dynamic class helpers
-  const getActiveNavClass = () => {
-    switch (themeColor) {
-      case 'emerald': return 'bg-emerald-600 text-white shadow-md';
-      case 'rose': return 'bg-rose-600 text-white shadow-md';
-      case 'blue': return 'bg-blue-600 text-white shadow-md';
-      case 'violet': return 'bg-violet-600 text-white shadow-md';
-      case 'orange': return 'bg-orange-600 text-white shadow-md';
-      default: return 'bg-indigo-600 text-white shadow-md';
-    }
-  };
-  
-  const getButtonClass = () => {
-     switch (themeColor) {
-      case 'emerald': return 'bg-emerald-600 hover:bg-emerald-700';
-      case 'rose': return 'bg-rose-600 hover:bg-rose-700';
-      case 'blue': return 'bg-blue-600 hover:bg-blue-700';
-      case 'violet': return 'bg-violet-600 hover:bg-violet-700';
-      case 'orange': return 'bg-orange-600 hover:bg-orange-700';
-      default: return 'bg-indigo-600 hover:bg-indigo-700';
-    }
-  };
-  
-  const getLogoBgClass = () => {
-     switch (themeColor) {
-      case 'emerald': return 'bg-emerald-500';
-      case 'rose': return 'bg-rose-500';
-      case 'blue': return 'bg-blue-500';
-      case 'violet': return 'bg-violet-500';
-      case 'orange': return 'bg-orange-500';
-      default: return 'bg-indigo-500';
-    }
-  };
-  
-  const getBorderClass = () => {
-     switch (themeColor) {
-      case 'emerald': return 'border-emerald-500';
-      case 'rose': return 'border-rose-500';
-      case 'blue': return 'border-blue-500';
-      case 'violet': return 'border-violet-500';
-      case 'orange': return 'border-orange-500';
-      default: return 'border-indigo-500';
-    }
+  const getViewTitle = (view: string) => {
+      switch(view) {
+          case 'dashboard': return `Olá, ${currentUser.name.split(' ')[0]}! 👋`;
+          case 'crm': return 'CRM Kanban';
+          case 'calendar': return 'Calendário';
+          case 'documents': return 'Documentos & Atas';
+          case 'approvals': return 'Central de Aprovações';
+          case 'reports': return 'Relatórios';
+          case 'import': return 'Importar Dados (Nifty)';
+          case 'settings': return 'Configurações';
+          default: return view.charAt(0).toUpperCase() + view.slice(1);
+      }
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 text-gray-900 font-sans overflow-hidden transition-colors duration-200">
+    <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e11] text-gray-900 dark:text-white font-sans overflow-hidden transition-colors duration-300">
       {/* Sidebar */}
       <aside
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-slate-900 text-white transition-all duration-300 flex flex-col flex-shrink-0 relative z-20 shadow-xl`}
+        } bg-white dark:bg-[#0b0e11] border-r border-gray-200 dark:border-[#2a303c] transition-all duration-300 flex flex-col flex-shrink-0 relative z-20`}
       >
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
+        <div className="h-20 flex items-center justify-between px-6">
           {isSidebarOpen && (
-            <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-              {settings.companyLogo ? (
-                  <img src={settings.companyLogo} className="w-8 h-8 rounded bg-white p-0.5 object-contain" alt="Logo"/>
-              ) : (
-                  <div className={`w-8 h-8 ${getLogoBgClass()} rounded-lg flex items-center justify-center`}>
-                    <span className="text-white">{settings.companyName.charAt(0)}</span>
-                  </div>
-              )}
-              <span className="truncate max-w-[140px]">{settings.companyName}</span>
+            <div className="flex items-center gap-2">
+               <div className={`w-8 h-8 rounded-full bg-gradient-to-tr from-${themeColor}-600 to-${themeColor}-400 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.4)]`}>
+                  <span className="font-bold text-white text-sm">{settings.companyName.charAt(0)}</span>
+               </div>
+               <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">{settings.companyName.split(' ')[0]}</span>
             </div>
           )}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 hover:bg-slate-800 rounded-md text-slate-400 hover:text-white"
+            className="p-1.5 text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-[#151a21] transition-colors"
           >
-            <Menu size={20} />
+            <Menu size={18} />
           </button>
         </div>
 
-        <nav className="flex-1 py-6 flex flex-col gap-1 px-3">
+        <div className="flex-1 py-6 flex flex-col gap-2 px-4 overflow-y-auto custom-scrollbar">
           {navItems
             .filter((item) => item.roles.includes(currentUser.role))
             .map((item) => (
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`flex items-center gap-3 p-3 rounded-lg transition-colors ${
-                  currentView === item.id
-                    ? getActiveNavClass()
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                className={`flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-200 group ${
+                  currentView === item.id 
+                    ? `bg-gray-100 dark:bg-[#151a21] text-gray-900 dark:text-white` 
+                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#151a21]/50'
                 }`}
               >
-                <item.icon size={22} strokeWidth={1.5} />
-                {isSidebarOpen && <span className="font-medium">{item.label}</span>}
+                <item.icon size={20} className={`${currentView === item.id ? `text-${themeColor}-500` : 'text-gray-500 group-hover:text-gray-400 dark:group-hover:text-gray-300'}`} />
+                {isSidebarOpen && <span className="font-medium text-sm">{item.label}</span>}
+                {isSidebarOpen && currentView === item.id && (
+                    <div className={`ml-auto w-1.5 h-1.5 rounded-full bg-${themeColor}-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]`}></div>
+                )}
               </button>
             ))}
-        </nav>
+        </div>
 
-        <div className="p-4 border-t border-slate-800 relative" ref={profileMenuRef}>
-          <div 
-            onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-            className={`flex items-center gap-3 cursor-pointer p-2 -m-2 rounded-lg hover:bg-slate-800 transition-colors ${!isSidebarOpen && 'justify-center'}`}
-          >
-            <img
-              src={currentUser.avatar}
-              alt="Profile"
-              className={`w-10 h-10 rounded-full border-2 ${getBorderClass()}`}
-            />
-            {isSidebarOpen && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold truncate">{currentUser.name}</p>
-                <p className="text-xs text-slate-500 truncate capitalize">{currentUser.role.toLowerCase()}</p>
-              </div>
-            )}
-          </div>
-
-          {isProfileMenuOpen && (
-            <div className="absolute bottom-full left-4 right-4 mb-2 w-auto bg-slate-950 rounded-lg shadow-2xl border border-slate-800 z-10 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-              <button
-                onClick={() => { onNavigate('profile'); setIsProfileMenuOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
-              >
-                <UserIcon size={16} />
-                Meu Perfil
-              </button>
-              <button
-                onClick={onLogout}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors border-t border-slate-800"
-              >
-                <LogOut size={16} />
-                Sair
-              </button>
-            </div>
+        <div className="p-6">
+          {isSidebarOpen ? (
+             <div className="bg-gray-50 dark:bg-[#151a21] rounded-3xl p-4 flex items-center gap-3 border border-gray-200 dark:border-[#2a303c]/50">
+                <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11]" />
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{currentUser.name}</p>
+                    <p className="text-xs text-gray-500 capitalize">{currentUser.role.toLowerCase()}</p>
+                </div>
+                <button onClick={onLogout} className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" title="Sair">
+                    <LogOut size={16} />
+                </button>
+             </div>
+          ) : (
+             <div className="flex justify-center">
+                 <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11]" />
+             </div>
           )}
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0 transition-colors duration-200">
-            <h1 className="text-2xl font-bold text-gray-800 capitalize tracking-tight">
-                {currentView === 'crm' ? 'CRM Kanban' : currentView.charAt(0).toUpperCase() + currentView.slice(1)}
-            </h1>
-            <div className="flex items-center gap-4">
-                {/* Notifications */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-gray-50 dark:bg-[#0b0e11] transition-colors duration-300">
+        {/* Header */}
+        <header className="h-20 flex items-center justify-between px-8 flex-shrink-0 bg-gray-50 dark:bg-[#0b0e11] transition-colors duration-300">
+            <div className="flex flex-col">
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white capitalize flex items-center gap-2">
+                    {getViewTitle(currentView)}
+                </h1>
+                {currentView === 'dashboard' && <p className="text-sm text-gray-500">Aqui está o que está acontecendo na sua loja este mês.</p>}
+            </div>
+
+            <div className="flex items-center gap-6">
+                <div className="relative hidden md:block">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                    <input 
+                        type="text" 
+                        placeholder="Pesquisar..." 
+                        className="bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] text-sm text-gray-900 dark:text-white rounded-full pl-11 pr-4 py-2.5 w-64 focus:outline-none focus:border-[#3b82f6] transition-colors placeholder-gray-400 dark:placeholder-gray-500"
+                    />
+                </div>
+
+                <button 
+                  onClick={onToggleTheme}
+                  className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-500 transition-all"
+                >
+                   {settings.darkMode ? <Moon size={18} /> : <Sun size={18} />}
+                </button>
+
                 <div className="relative" ref={notifRef}>
-                    <div 
-                      className="relative cursor-pointer p-2 hover:bg-gray-100 rounded-full transition-colors"
+                    <button 
+                      className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-500 transition-all relative"
                       onClick={() => setIsNotifOpen(!isNotifOpen)}
                     >
-                        <Bell className={`text-gray-500 hover:text-${themeColor}-600`} size={20} />
+                        <Bell size={18} />
                         {unreadCount > 0 && (
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                            <span className={`absolute top-0 right-0 w-3 h-3 bg-${themeColor}-500 rounded-full border-2 border-white dark:border-[#0b0e11]`}></span>
                         )}
-                    </div>
+                    </button>
 
                     {isNotifOpen && (
-                      <div className="absolute right-0 top-12 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                         <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
-                            <h3 className="font-bold text-gray-800 text-sm">Notifications</h3>
+                      <div className="absolute right-0 top-14 w-80 bg-white dark:bg-[#151a21] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#2a303c] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                         <div className="p-4 border-b border-gray-200 dark:border-[#2a303c] flex items-center justify-between">
+                            <h3 className="font-bold text-gray-900 dark:text-white text-sm">Notificações</h3>
                             {notifications.length > 0 && (
                                 <button 
                                   onClick={onClearNotifications} 
-                                  className="text-xs text-gray-500 hover:text-red-600 flex items-center gap-1"
+                                  className="text-xs text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
                                 >
-                                  <Trash2 size={12} /> Clear All
+                                  <Trash2 size={12} /> Limpar
                                 </button>
                             )}
                          </div>
                          <div className="max-h-80 overflow-y-auto">
                             {notifications.length === 0 ? (
-                                <div className="p-8 text-center text-gray-400 text-sm">
-                                    <Bell size={24} className="mx-auto mb-2 opacity-20" />
-                                    No notifications yet
+                                <div className="p-8 text-center text-gray-500 text-sm">
+                                    Sem notificações
                                 </div>
                             ) : (
                                 notifications.map(n => (
                                   <div 
                                     key={n.id} 
-                                    onClick={() => onMarkRead(n.id)}
-                                    className={`p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors ${!n.read ? 'bg-blue-50/50' : ''}`}
+                                    onClick={() => {
+                                        onNotificationClick(n);
+                                        setIsNotifOpen(false);
+                                    }}
+                                    className={`p-3 border-b border-gray-100 dark:border-[#2a303c] hover:bg-gray-50 dark:hover:bg-[#1e232d] cursor-pointer transition-colors ${!n.read ? 'bg-gray-50 dark:bg-[#1e232d]/50' : ''}`}
                                   >
                                       <div className="flex justify-between items-start mb-1">
-                                          <span className={`text-xs font-bold ${n.type === 'error' ? 'text-red-600' : n.type === 'success' ? 'text-green-600' : 'text-gray-800'}`}>
+                                          <span className={`text-xs font-bold ${n.type === 'error' ? 'text-red-500 dark:text-red-400' : n.type === 'success' ? 'text-green-500 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
                                             {n.title}
                                           </span>
-                                          <span className="text-[10px] text-gray-400">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                          <span className="text-[10px] text-gray-500">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                       </div>
-                                      <p className="text-xs text-gray-600 line-clamp-2">{n.message}</p>
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{n.message}</p>
                                   </div>
                                 ))
                             )}
@@ -254,18 +223,26 @@ export const Layout: React.FC<LayoutProps> = ({
                     )}
                 </div>
 
-                {/* Only show New Task button if allowed (ADMIN or MANAGER) */}
+                <button 
+                    onClick={onOpenProfile}
+                    className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 dark:border-[#2a303c] hover:ring-2 hover:ring-[#3b82f6] transition-all cursor-pointer"
+                    title="Editar Perfil"
+                >
+                    <img src={currentUser.avatar} alt="User" className="w-full h-full object-cover"/>
+                </button>
+                
                 {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER) && (
                     <button 
                         onClick={onNewTask}
-                        className={`${getButtonClass()} text-white px-4 py-2 rounded-md text-sm font-medium transition-all shadow-sm hover:shadow-md`}
+                        className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-full text-sm font-medium transition-all shadow-[0_0_15px_rgba(79,70,229,0.3)]`}
                     >
-                        + New Task
+                        + Nova Tarefa
                     </button>
                 )}
             </div>
         </header>
-        <div className="flex-1 overflow-auto bg-gray-100 p-6 transition-colors duration-200">
+
+        <div className="flex-1 overflow-auto p-8 pt-4">
             {children}
         </div>
       </main>

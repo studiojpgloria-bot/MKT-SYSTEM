@@ -1,24 +1,7 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { MoreHorizontal, Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, Trash2, Check, Download, CheckSquare } from 'lucide-react';
-import { Task, TaskPriority, User, WorkflowStage, UserRole } from '../types';
-import { QuickTaskForm } from './QuickTaskForm';
 
-// Helper to get a consistent color for a tag
-const getTagColor = (tag: string) => {
-    const colors = [
-        'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900',
-        'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-900',
-        'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-900',
-        'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-300 dark:border-rose-900',
-        'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-900',
-        'bg-sky-100 text-sky-700 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:border-sky-900',
-    ];
-    let hash = 0;
-    for (let i = 0; i < tag.length; i++) {
-        hash = tag.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-};
+import React, { useState, useRef, useEffect } from 'react';
+import { Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, CheckSquare } from 'lucide-react';
+import { Task, TaskPriority, User, WorkflowStage, UserRole } from '../types';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -30,7 +13,7 @@ interface KanbanBoardProps {
   onTaskClick: (taskId: string) => void;
   onDeleteTask: (taskId: string) => void;
   onExportTask: (taskId: string) => void;
-  onCreateTask: (title: string, stageId: string) => void;
+  onNewTask: (stageId: string) => void;
 }
 
 const DueDateBadge = ({ dueDate, onUpdate }: { dueDate: number; onUpdate: (date: number) => void }) => {
@@ -60,7 +43,7 @@ const DueDateBadge = ({ dueDate, onUpdate }: { dueDate: number; onUpdate: (date:
     return (
       <input
         type="date"
-        className="text-xs border border-indigo-300 rounded px-2 py-0.5 bg-white dark:bg-slate-800 dark:text-white dark:border-slate-600 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent z-10 relative"
+        className="text-xs border border-[#3b82f6] rounded px-2 py-0.5 bg-white dark:bg-[#151a21] text-gray-900 dark:text-white shadow-sm focus:outline-none focus:ring-1 focus:ring-[#3b82f6] z-10 relative"
         defaultValue={formatDateForInput(dueDate)}
         onBlur={() => setIsEditing(false)}
         onChange={handleDateChange}
@@ -77,17 +60,17 @@ const DueDateBadge = ({ dueDate, onUpdate }: { dueDate: number; onUpdate: (date:
         e.stopPropagation();
         setIsEditing(true);
       }}
-      className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer px-2 py-1 rounded transition-colors border border-transparent hover:border-gray-200 dark:hover:border-slate-600 hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm ${
+      className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer px-2 py-1 rounded transition-colors border border-transparent hover:bg-gray-100 dark:hover:bg-[#2a303c] ${
         isOverdue
-          ? 'text-red-600 bg-red-50/50'
+          ? 'text-red-500 dark:text-red-400 bg-red-500/10'
           : isUrgent
-          ? 'text-orange-600 bg-orange-50/50'
-          : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
+          ? 'text-orange-500 dark:text-orange-400 bg-orange-500/10'
+          : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
       }`}
-      title="Click to change due date"
+      title="Clique para alterar a data"
     >
       {isOverdue ? <AlertTriangle size={13} /> : <Clock size={13} />}
-      <span>{isOverdue ? 'Overdue' : daysLeft === 0 ? 'Today' : `${daysLeft}d`}</span>
+      <span>{isOverdue ? 'Atrasado' : daysLeft === 0 ? 'Hoje' : `${daysLeft}d`}</span>
     </div>
   );
 };
@@ -102,42 +85,25 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onTaskClick, 
   onDeleteTask, 
   onExportTask,
-  onCreateTask
+  onNewTask
 }) => {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'ALL'>('ALL');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('ALL');
-  
-  // State for card context menu
-  const [activeMenuTaskId, setActiveMenuTaskId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  // State for inline task creation
-  const [addingToStage, setAddingToStage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setActiveMenuTaskId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const getPriorityColor = (priority: TaskPriority) => {
     switch (priority) {
-      case TaskPriority.URGENT: return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-900';
-      case TaskPriority.HIGH: return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-900';
-      case TaskPriority.MEDIUM: return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-900';
-      default: return 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700';
+      case TaskPriority.URGENT: return 'bg-red-500/20 text-red-500 dark:text-red-400 border-red-500/30';
+      case TaskPriority.HIGH: return 'bg-orange-500/20 text-orange-500 dark:text-orange-400 border-orange-500/30';
+      case TaskPriority.MEDIUM: return 'bg-blue-500/20 text-blue-500 dark:text-blue-400 border-blue-500/30';
+      default: return 'bg-gray-200 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600/30';
     }
   };
 
-  const filteredTasks = useMemo(() => tasks.filter(task => {
+  const filteredTasks = tasks.filter(task => {
       const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                            (task.clients?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            task.client.toLowerCase().includes(searchQuery.toLowerCase()) ||
                             task.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())) ||
                             task.id.toLowerCase().includes(searchQuery.toLowerCase());
       
@@ -145,7 +111,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       const matchesAssignee = assigneeFilter === 'ALL' || task.assigneeId === assigneeFilter;
 
       return matchesSearch && matchesPriority && matchesAssignee;
-  }), [tasks, searchQuery, priorityFilter, assigneeFilter]);
+  });
 
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     setDraggedTaskId(taskId);
@@ -170,20 +136,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   return (
     <div className="h-full flex flex-col">
       {/* Toolbar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 bg-white dark:bg-slate-900 p-3 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6 bg-white dark:bg-[#151a21] p-4 rounded-3xl border border-gray-200 dark:border-[#2a303c]/50 transition-colors duration-300">
           <div className="relative w-full md:w-64">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
               <input 
                   type="text" 
-                  placeholder="Search by ID, title..."
+                  placeholder="Buscar por ID, título..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-sm focus:ring-2 focus:ring-${themeColor}-500 focus:border-transparent bg-transparent dark:text-white`}
+                  className={`w-full pl-9 pr-3 py-2.5 rounded-2xl bg-gray-50 dark:bg-[#0b0e11] border border-gray-200 dark:border-[#2a303c] text-sm text-gray-900 dark:text-white focus:outline-none focus:border-${themeColor}-500 transition-colors`}
               />
               {searchQuery && (
                   <button 
                     onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-900 dark:hover:text-white"
                   >
                       <X size={14} />
                   </button>
@@ -191,26 +157,26 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800">
-                  <Filter size={14} className="text-gray-500 dark:text-slate-400" />
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-[#2a303c] bg-gray-50 dark:bg-[#0b0e11]">
+                  <Filter size={14} className="text-gray-500" />
                   <select 
                     value={priorityFilter}
                     onChange={(e) => setPriorityFilter(e.target.value as any)}
-                    className="bg-transparent border-none text-sm text-gray-700 dark:text-slate-200 focus:ring-0 p-0 cursor-pointer"
+                    className="bg-transparent border-none text-sm text-gray-700 dark:text-gray-300 focus:ring-0 p-0 cursor-pointer"
                   >
-                      <option value="ALL">All Priorities</option>
+                      <option value="ALL">Todas Prioridades</option>
                       {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
               </div>
 
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800">
-                  <span className="text-sm text-gray-500 dark:text-slate-400">Assignee:</span>
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-gray-200 dark:border-[#2a303c] bg-gray-50 dark:bg-[#0b0e11]">
+                  <span className="text-sm text-gray-500">Responsável:</span>
                   <select 
                     value={assigneeFilter}
                     onChange={(e) => setAssigneeFilter(e.target.value)}
-                    className="bg-transparent border-none text-sm text-gray-700 dark:text-slate-200 focus:ring-0 p-0 cursor-pointer min-w-[100px]"
+                    className="bg-transparent border-none text-sm text-gray-700 dark:text-gray-300 focus:ring-0 p-0 cursor-pointer min-w-[100px]"
                   >
-                      <option value="ALL">All Members</option>
+                      <option value="ALL">Todos Membros</option>
                       {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
               </div>
@@ -230,10 +196,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onDrop={(e) => handleDrop(e, stage.id)}
             >
               {/* Column Header */}
-              <div className="flex items-center justify-between mb-4 px-1">
-                <h3 className="font-bold text-slate-700 dark:text-slate-200 uppercase text-sm tracking-wider flex items-center gap-2">
+              <div className="flex items-center justify-between mb-4 px-2">
+                <h3 className="font-bold text-gray-500 dark:text-gray-300 uppercase text-xs tracking-widest flex items-center gap-2">
                   {stage.name}
-                  <span className="bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs py-0.5 px-2 rounded-full">
+                  <span className="bg-gray-200 dark:bg-[#2a303c] text-gray-700 dark:text-white text-[10px] py-0.5 px-2 rounded-full">
                     {stageTasks.length}
                   </span>
                 </h3>
@@ -241,15 +207,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
               {/* Drop Zone */}
               <div 
-                className={`flex-1 bg-slate-100/50 dark:bg-slate-900/50 rounded-xl p-2 space-y-3 overflow-y-auto hide-scrollbar border-2 ${
-                  draggedTaskId ? `border-dashed border-${themeColor}-200 bg-${themeColor}-50/30 dark:bg-${themeColor}-900/20` : 'border-transparent'
+                className={`flex-1 bg-gray-100/50 dark:bg-[#151a21]/50 rounded-3xl p-3 space-y-3 overflow-y-auto hide-scrollbar border-2 ${
+                  draggedTaskId ? `border-dashed border-[#3b82f6]/30 bg-[#3b82f6]/5` : 'border-transparent'
                 } transition-colors`}
               >
                 {stageTasks.map((task) => {
                   const assignee = users.find(u => u.id === task.assigneeId);
-                  const isMenuOpen = activeMenuTaskId === task.id;
-                  
-                  // Calculate subtask progress
                   const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
                   const totalSubtasks = task.subtasks?.length || 0;
 
@@ -259,104 +222,56 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       draggable
                       onDragStart={(e) => handleDragStart(e, task.id)}
                       onClick={() => onTaskClick(task.id)}
-                      className={`bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm hover:shadow-md cursor-grab active:cursor-grabbing border border-gray-100 dark:border-slate-800 transition-all group relative hover:border-${themeColor}-200 dark:hover:border-${themeColor}-800`}
+                      className="bg-white dark:bg-[#1e232d] p-4 rounded-2xl shadow-sm border border-gray-200 dark:border-[#2a303c]/50 hover:border-[#3b82f6]/50 cursor-grab active:cursor-grabbing transition-all group relative"
                     >
-                      {/* Top Row: Priority, ID, Menu */}
-                      <div className="flex items-start justify-between mb-2">
+                      {/* Top Row */}
+                      <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getPriorityColor(task.priority)}`}>
                               {task.priority}
                             </span>
-                            <span className="text-[10px] font-mono text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-800 px-1 rounded border border-gray-100 dark:border-slate-700">
+                            <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-[#151a21] px-1.5 rounded border border-gray-200 dark:border-[#2a303c]">
                                 #{task.id}
                             </span>
                         </div>
-                        
-                        {/* Context Menu Trigger */}
-                        <div className="relative">
-                           <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenuTaskId(isMenuOpen ? null : task.id);
-                              }}
-                              className="p-1 text-gray-300 hover:text-gray-600 dark:text-slate-600 dark:hover:text-slate-400 rounded hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                           >
-                              <MoreHorizontal size={16} />
-                           </button>
-                           
-                           {/* Context Menu Dropdown */}
-                           {isMenuOpen && (
-                             <div 
-                               ref={menuRef}
-                               className="absolute right-0 top-6 w-40 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-gray-100 dark:border-slate-700 z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-100"
-                               onClick={(e) => e.stopPropagation()}
-                             >
-                               <button 
-                                  onClick={() => {
-                                    onExportTask(task.id);
-                                    setActiveMenuTaskId(null);
-                                  }}
-                                  className="w-full px-4 py-2 text-left text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-indigo-600 flex items-center gap-2"
-                                >
-                                  <Download size={14} /> Export CSV
-                               </button>
-                               {canEdit && (
-                                 <button 
-                                    onClick={() => {
-                                      if(window.confirm('Are you sure you want to delete this task?')) onDeleteTask(task.id);
-                                    }}
-                                    className="w-full px-4 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 border-t border-gray-50 dark:border-slate-700"
-                                 >
-                                    <Trash2 size={14} /> Delete Task
-                                 </button>
-                               )}
-                             </div>
-                           )}
-                        </div>
                       </div>
 
-                      {/* Title */}
-                      <h4 className="font-semibold text-gray-800 dark:text-white mb-1 leading-tight">
+                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2 leading-tight">
                           {task.title}
                       </h4>
-                      <p className="text-xs text-gray-500 dark:text-slate-400 font-medium mb-3">
-                          {task.clients?.name || 'No Client'}
+                      <p className="text-xs text-gray-500 line-clamp-2 mb-4">
+                          {task.description}
                       </p>
 
-                      {/* Tags */}
                       {task.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-3">
+                        <div className="flex flex-wrap gap-1.5 mb-4">
                            {task.tags.slice(0, 3).map(tag => (
-                            <span key={tag} className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getTagColor(tag)}`}>
+                            <span key={tag} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-50 dark:bg-[#151a21] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#2a303c]">
                               {tag}
                             </span>
                           ))}
                         </div>
                       )}
 
-                      {/* Footer */}
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-50 dark:border-slate-800">
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-[#2a303c]">
                           <div className="flex items-center gap-3">
                               {assignee && (
                                   <img 
                                       src={assignee.avatar} 
                                       alt={assignee.name} 
-                                      title={assignee.name}
-                                      className="w-6 h-6 rounded-full ring-2 ring-white dark:ring-slate-800" 
+                                      className="w-6 h-6 rounded-full border border-gray-200 dark:border-[#2a303c]" 
                                   />
                               )}
                               
-                              {/* Attachments Count */}
                               {task.attachments.length > 0 && (
-                                  <div className="flex items-center gap-1 text-gray-400 text-xs">
+                                  <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 text-xs">
                                       <Paperclip size={12} />
                                       <span>{task.attachments.length}</span>
                                   </div>
                               )}
 
-                              {/* Subtasks Count */}
                               {totalSubtasks > 0 && (
-                                  <div className={`flex items-center gap-1 text-xs ${completedSubtasks === totalSubtasks ? 'text-green-600' : 'text-gray-400'}`}>
+                                  <div className={`flex items-center gap-1 text-xs ${completedSubtasks === totalSubtasks ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`}>
                                       <CheckSquare size={12} />
                                       <span>{completedSubtasks}/{totalSubtasks}</span>
                                   </div>
@@ -372,26 +287,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   );
                 })}
                 
-                {/* Add Task: Inline Form vs Button */}
                 {canEdit && (
-                  <>
-                    {addingToStage === stage.id ? (
-                       <QuickTaskForm 
-                          stageId={stage.id}
-                          themeColor={themeColor}
-                          onCreateTask={onCreateTask}
-                          onCancel={() => setAddingToStage(null)}
-                       />
-                    ) : (
-                      <button 
-                        onClick={() => setAddingToStage(stage.id)}
-                        className={`w-full py-2 rounded-lg border border-dashed border-gray-300 dark:border-slate-700 text-gray-400 hover:border-${themeColor}-400 hover:text-${themeColor}-500 flex items-center justify-center gap-2 text-sm transition-colors`}
-                      >
-                        <Plus size={16} />
-                        Add Task
-                      </button>
-                    )}
-                  </>
+                  <button 
+                    onClick={() => onNewTask(stage.id)}
+                    className="w-full py-3 rounded-2xl border border-dashed border-gray-300 dark:border-[#2a303c] text-gray-400 dark:text-gray-500 hover:border-[#3b82f6] hover:text-[#3b82f6] flex items-center justify-center gap-2 text-sm transition-all"
+                  >
+                    <Plus size={16} />
+                    Adicionar Tarefa
+                  </button>
                 )}
               </div>
             </div>

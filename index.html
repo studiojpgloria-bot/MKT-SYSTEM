@@ -1,11 +1,39 @@
+
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nexus Marketing CRM</title>
+    <title>Nexus Gestão de Marketing</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Poppins', 'sans-serif'],
+            },
+            colors: {
+              dark: {
+                bg: '#0b0e11',
+                card: '#151a21',
+                hover: '#1e232d',
+                border: '#2a303c',
+              }
+            }
+          }
+        }
+      }
+    </script>
     <style>
+      body {
+        background-color: #0b0e11;
+        font-family: 'Poppins', sans-serif;
+      }
       /* Custom scrollbar for Kanban */
       .hide-scrollbar::-webkit-scrollbar {
         display: none;
@@ -14,11 +42,36 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      /* Dark Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #0b0e11; 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #2a303c; 
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #3b4252; 
+      }
     </style>
-<link rel="stylesheet" href="/index.css">
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.1/+esm"
+  }
+}
+</script>
 </head>
-  <body>
+  <body class="bg-[#0b0e11] text-white">
     <div id="root"></div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+  </body>
 </html>
