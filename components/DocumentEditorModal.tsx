@@ -98,7 +98,7 @@ export const DocumentEditorModal: React.FC<DocumentEditorModalProps> = ({
             const img = new Image();
             img.src = e.target?.result as string;
             img.onload = () => {
-                const canvas = document.createElement('canvas');
+                const canvas = window.document.createElement('canvas'); // Fix: Disambiguated global document from local prop shadowing
                 const ctx = canvas.getContext('2d');
                 const maxWidth = 1200; // Reasonable width for docs
                 let width = img.width;
@@ -351,7 +351,7 @@ export const DocumentEditorModal: React.FC<DocumentEditorModalProps> = ({
                                         <button 
                                             key={e}
                                             onClick={() => { setEmoji(e); setShowEmojiPicker(false); }}
-                                            className="w-10 h-10 flex items-center justify-center text-2xl hover:bg-gray-100 dark:hover:bg-[#2a303c] rounded-lg transition-colors"
+                                            className="w-10 h-10 flex items-center justify-center text-2xl hover:bg-gray-100 dark:hover:bg-[#1e232d] rounded-lg transition-colors"
                                         >
                                             {e}
                                         </button>
@@ -467,11 +467,12 @@ export const DocumentEditorModal: React.FC<DocumentEditorModalProps> = ({
                 <div 
                     ref={contentRef}
                     contentEditable
+                    // Fix: placeholder on div is not standard React prop; changed to data-attribute for CSS attr() compatibility
                     onBlur={saveSelection}
                     onMouseUp={saveSelection}
                     onKeyUp={saveSelection}
-                    className="min-h-[400px] outline-none text-lg text-gray-800 dark:text-gray-300 leading-relaxed empty:before:content-[attr(placeholder)] empty:before:text-gray-400 document-editor-content pb-20"
-                    placeholder="Comece a digitar ou digite '/' para comandos..."
+                    className="min-h-[400px] outline-none text-lg text-gray-800 dark:text-gray-300 leading-relaxed empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 document-editor-content pb-20"
+                    data-placeholder="Comece a digitar ou digite '/' para comandos..."
                 />
             </div>
         </div>

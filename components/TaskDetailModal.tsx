@@ -11,16 +11,17 @@ interface TaskDetailModalProps {
   workflow: WorkflowStage[]; 
   isOpen: boolean;
   onClose: () => void;
-  onUpdate: (taskId: string, updates: Partial<Task>) => void;
-  onCreate?: (task: Task) => void;
-  onAddComment: (taskId: string, text: string) => void;
-  onDelete: (taskId: string) => void;
-  onDuplicate: (taskId: string) => void;
-  onUpload: (taskId: string, file: File) => void;
-  onCloudImport: (taskId: string, service: string) => void;
-  onAccept: (taskId: string) => void;
-  onApprove: (taskId: string, attachmentId: string) => void;
-  onReject: (taskId: string, attachmentId: string) => void;
+  // Fix: Updated return types to allow Promise<void> for asynchronous event handlers passed from App.tsx
+  onUpdate: (taskId: string, updates: Partial<Task>) => void | Promise<void>;
+  onCreate?: (task: Task) => void | Promise<void>;
+  onAddComment: (taskId: string, text: string) => void | Promise<void>;
+  onDelete: (taskId: string) => void | Promise<void>;
+  onDuplicate: (taskId: string) => void | Promise<void>;
+  onUpload: (taskId: string, file: File) => void | Promise<void>;
+  onCloudImport: (taskId: string, service: string) => void | Promise<void>;
+  onAccept: (taskId: string) => void | Promise<void>;
+  onApprove: (taskId: string, attachmentId: string) => void | Promise<void>;
+  onReject: (taskId: string, attachmentId: string, feedback?: string) => void | Promise<void>;
   settings?: SystemSettings;
 }
 

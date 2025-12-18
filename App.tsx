@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Task, User, UserRole, WorkflowStage, SystemSettings, Notification, 
@@ -98,16 +97,27 @@ export const App: React.FC = () => {
       const { data: eventData } = await supabase.from('calendar_events').select('*');
       if (eventData) setEvents(eventData);
 
-      const { data: settingsData } = await supabase.from('system_settings').select('*').single();
-      if (settingsData) {
-          // Robust merging to prevent undefined properties in nested JSON columns
+      const { data: settingsData, error: settingsError } = await supabase.from('system_settings').select('*').maybeSingle();
+      if (settingsData && !settingsError) {
           setSettings({
               ...INITIAL_SETTINGS,
               ...settingsData,
-              loginScreen: { ...INITIAL_SETTINGS.loginScreen, ...(settingsData.loginScreen || {}) },
-              notifications: { ...INITIAL_SETTINGS.notifications, ...(settingsData.notifications || {}) },
-              security: { ...INITIAL_SETTINGS.security, ...(settingsData.security || {}) },
-              workflowRules: { ...INITIAL_SETTINGS.workflowRules, ...(settingsData.workflowRules || {}) }
+              loginScreen: { 
+                ...INITIAL_SETTINGS.loginScreen, 
+                ...(settingsData.loginScreen || {}) 
+              },
+              notifications: { 
+                ...INITIAL_SETTINGS.notifications, 
+                ...(settingsData.notifications || {}) 
+              },
+              security: { 
+                ...INITIAL_SETTINGS.security, 
+                ...(settingsData.security || {}) 
+              },
+              workflowRules: { 
+                ...INITIAL_SETTINGS.workflowRules, 
+                ...(settingsData.workflowRules || {}) 
+              }
           });
       }
 
@@ -140,7 +150,9 @@ export const App: React.FC = () => {
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
-    document.documentElement.classList.toggle('dark', settings.darkMode);
+    if (settings?.darkMode !== undefined) {
+      document.documentElement.classList.toggle('dark', settings.darkMode);
+    }
   };
 
   const handleLogout = () => {
