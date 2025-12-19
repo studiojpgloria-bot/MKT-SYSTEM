@@ -1,6 +1,5 @@
-
 import React, { useState, useRef } from 'react';
-import { Save, User as UserIcon, Building, Palette, Shield, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon, ArrowRight, Upload, X, Key, Edit, Eye, EyeOff } from 'lucide-react';
+import { Save, User as UserIcon, Building, Palette, Shield, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon, ArrowRight, Upload, X, Key, Edit, Eye, EyeOff, Moon, Sun } from 'lucide-react';
 import { SystemSettings, User, UserRole, WorkflowStage, Task } from '../types';
 
 interface SettingsProps {
@@ -30,13 +29,9 @@ export const Settings: React.FC<SettingsProps> = ({
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: UserRole.MEMBER, password: '' });
   const [newStage, setNewStage] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [editUserPassword, setEditUserPassword] = useState('');
-  const [showEditPassword, setShowEditPassword] = useState(false);
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveSettings = () => onUpdateSettings(localSettings);
 
@@ -54,18 +49,6 @@ export const Settings: React.FC<SettingsProps> = ({
       };
       onUpdateUsers([...users, user]);
       setNewUser({ name: '', email: '', role: UserRole.MEMBER, password: '' });
-      setShowNewPassword(false);
-    }
-  };
-
-  const handleUpdateUser = () => {
-    if (editingUser) {
-      const updatedUsers = users.map(u => 
-        u.id === editingUser.id ? { ...editingUser, password: editUserPassword || u.password } : u
-      );
-      onUpdateUsers(updatedUsers);
-      setEditingUser(null);
-      setEditUserPassword('');
     }
   };
 
@@ -92,8 +75,9 @@ export const Settings: React.FC<SettingsProps> = ({
     onUpdateWorkflow(workflow.filter(s => s.id !== id));
   };
 
+  // Added handler to fix missing handleStageNameChange reference
   const handleStageNameChange = (id: string, newName: string) => {
-      onUpdateWorkflow(workflow.map(s => s.id === id ? { ...s, name: newName } : s));
+    onUpdateWorkflow(workflow.map(s => s.id === id ? { ...s, name: newName } : s));
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,8 +85,21 @@ export const Settings: React.FC<SettingsProps> = ({
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        const url = event.target?.result as string;
-        setLocalSettings({ ...localSettings, companyLogo: url });
+        setLocalSettings({ ...localSettings, companyLogo: event.target?.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setLocalSettings({ 
+          ...localSettings, 
+          loginScreen: { ...localSettings.loginScreen, bannerUrl: event.target?.result as string } 
+        });
       };
       reader.readAsDataURL(file);
     }
@@ -119,6 +116,15 @@ export const Settings: React.FC<SettingsProps> = ({
     </button>
   );
 
+  const colors = [
+    { id: 'indigo', hex: '#4f46e5' },
+    { id: 'blue', hex: '#2563eb' },
+    { id: 'emerald', hex: '#10b981' },
+    { id: 'rose', hex: '#f43f5e' },
+    { id: 'violet', hex: '#8b5cf6' },
+    { id: 'orange', hex: '#f59e0b' },
+  ];
+
   return (
     <div className="max-w-6xl mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden flex h-[calc(100vh-8rem)] min-h-[600px]">
       <div className="w-64 bg-gray-50 dark:bg-slate-950 p-6 border-r border-gray-200 dark:border-slate-800 flex-shrink-0 overflow-y-auto">
@@ -133,7 +139,7 @@ export const Settings: React.FC<SettingsProps> = ({
         </nav>
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8 bg-white dark:bg-slate-900">
           {activeTab === 'company' && (
             <div className="space-y-6 animate-in fade-in duration-300">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">Informações da Empresa</h3>
@@ -153,27 +159,10 @@ export const Settings: React.FC<SettingsProps> = ({
                           )}
                       </div>
                       <div className="flex-1 space-y-2">
-                        <input 
-                          type="file" 
-                          ref={logoInputRef}
-                          className="hidden" 
-                          accept="image/*"
-                          onChange={handleLogoUpload}
-                        />
-                        <button 
-                          onClick={() => logoInputRef.current?.click()}
-                          className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2"
-                        >
+                        <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                        <button onClick={() => logoInputRef.current?.click()} className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2">
                           <Upload size={16} /> Fazer Upload
                         </button>
-                        {localSettings.companyLogo && (
-                          <button 
-                            onClick={() => setLocalSettings({...localSettings, companyLogo: ''})}
-                            className="w-full py-2 px-4 bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-gray-400 rounded-lg text-sm font-medium hover:text-red-500 transition-all flex items-center justify-center gap-2"
-                          >
-                            <X size={16} /> Remover Logo
-                          </button>
-                        )}
                       </div>
                    </div>
                 </div>
@@ -181,12 +170,113 @@ export const Settings: React.FC<SettingsProps> = ({
             </div>
           )}
 
+          {activeTab === 'appearance' && (
+            <div className="space-y-8 animate-in fade-in duration-300">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">Aparência do Sistema</h3>
+              
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-4">Cor de Destaque</label>
+                  <div className="flex gap-4">
+                    {colors.map((c) => (
+                      <button 
+                        key={c.id} 
+                        onClick={() => setLocalSettings({...localSettings, themeColor: c.id as any})}
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all border-4 ${localSettings.themeColor === c.id ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
+                        style={{ backgroundColor: c.hex }}
+                      >
+                        {localSettings.themeColor === c.id && <Check className="text-white" size={24} />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="max-w-md p-6 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        {localSettings.darkMode ? <Moon size={18} /> : <Sun size={18} />} Modo Escuro
+                      </h4>
+                      <p className="text-xs text-gray-500">Alternar tema visual do sistema</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" checked={localSettings.darkMode} onChange={(e) => setLocalSettings({...localSettings, darkMode: e.target.checked})} className="sr-only peer" />
+                      <div className="w-11 h-6 bg-gray-200 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'login' && (
+             <div className="space-y-8 animate-in fade-in duration-300">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">Personalização da Entrada</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="space-y-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Título da Tela</label>
+                        <input type="text" value={localSettings.loginScreen.title} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, title: e.target.value}})} className="w-full p-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Subtítulo</label>
+                        <textarea value={localSettings.loginScreen.subtitle} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, subtitle: e.target.value}})} className="w-full p-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl resize-none" rows={3} />
+                      </div>
+                   </div>
+                   <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Banner Lateral</label>
+                      <div className="aspect-video w-full rounded-2xl bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 overflow-hidden relative group">
+                         {localSettings.loginScreen.bannerUrl ? (
+                            <img src={localSettings.loginScreen.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                         ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400"><ImageIcon size={48} /></div>
+                         )}
+                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <input type="file" ref={bannerInputRef} className="hidden" accept="image/*" onChange={handleBannerUpload} />
+                            <button onClick={() => bannerInputRef.current?.click()} className="bg-white text-black px-4 py-2 rounded-lg font-bold flex items-center gap-2">
+                               <Upload size={16} /> Trocar Imagem
+                            </button>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          )}
+
+          {activeTab === 'team' && (
+              <div className="space-y-6">
+                  <h3 className="text-lg font-bold dark:text-white">Equipe</h3>
+                  <div className="bg-[#151a21] p-6 rounded-2xl border border-[#2a303c] space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <input type="text" placeholder="Nome" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
+                          <input type="email" placeholder="Email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
+                          <input type="password" placeholder="Senha" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
+                          <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as any})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm">
+                              {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                      </div>
+                      <button onClick={handleAddUser} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl">Adicionar Membro</button>
+                  </div>
+                  <div className="space-y-2">
+                      {users.map(u => (
+                          <div key={u.id} className="flex items-center justify-between p-4 bg-[#151a21] rounded-xl border border-[#2a303c]">
+                              <div className="flex items-center gap-3">
+                                  <img src={u.avatar} className="w-10 h-10 rounded-full" />
+                                  <div><p className="font-bold text-white text-sm">{u.name}</p><p className="text-xs text-gray-500">{u.email}</p></div>
+                              </div>
+                              <button onClick={() => handleRemoveUser(u.id)} className="text-gray-500 hover:text-red-500"><Trash2 size={16}/></button>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          )}
+
           {activeTab === 'workflow' && (
              <div className="space-y-8 animate-in fade-in duration-300">
                 <div>
                    <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Etapas do Kanban</h3>
                    <div className="space-y-3 max-w-2xl">
-                       {workflow.map((stage, index) => (
+                       {workflow.map((stage) => (
                            <div key={stage.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg group">
                                <GripVertical size={16} className="text-gray-400" />
                                <input type="text" value={stage.name} onChange={(e) => handleStageNameChange(stage.id, e.target.value)} className="flex-1 bg-transparent font-medium dark:text-white outline-none" />
@@ -226,34 +316,6 @@ export const Settings: React.FC<SettingsProps> = ({
              </div>
           )}
 
-          {activeTab === 'team' && (
-              <div className="space-y-6">
-                  <h3 className="text-lg font-bold dark:text-white">Equipe</h3>
-                  <div className="bg-[#151a21] p-6 rounded-2xl border border-[#2a303c] space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <input type="text" placeholder="Nome" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
-                          <input type="email" placeholder="Email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
-                          <input type="password" placeholder="Senha" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
-                          <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as any})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm">
-                              {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
-                          </select>
-                      </div>
-                      <button onClick={handleAddUser} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl">Adicionar Membro</button>
-                  </div>
-                  <div className="space-y-2">
-                      {users.map(u => (
-                          <div key={u.id} className="flex items-center justify-between p-4 bg-[#151a21] rounded-xl border border-[#2a303c]">
-                              <div className="flex items-center gap-3">
-                                  <img src={u.avatar} className="w-10 h-10 rounded-full" />
-                                  <div><p className="font-bold text-white text-sm">{u.name}</p><p className="text-xs text-gray-500">{u.email}</p></div>
-                              </div>
-                              <button onClick={() => handleRemoveUser(u.id)} className="text-gray-500 hover:text-red-500"><Trash2 size={16}/></button>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          )}
-
           {activeTab === 'security' && (
              <div className="space-y-8 animate-in fade-in duration-300">
                 <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">Segurança e Dados</h3>
@@ -268,16 +330,8 @@ export const Settings: React.FC<SettingsProps> = ({
                             <p className="text-sm text-gray-500 dark:text-slate-400">Exigir verificação de código por email no login</p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
-                          <input 
-                              type="checkbox" 
-                              checked={localSettings?.security?.twoFactor || false}
-                              onChange={(e) => setLocalSettings({
-                                  ...localSettings, 
-                                  security: {...localSettings.security, twoFactor: e.target.checked}
-                              })}
-                              className="sr-only peer" 
-                          />
-                          <div className={`w-11 h-6 bg-gray-200 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600`}></div>
+                          <input type="checkbox" checked={localSettings?.security?.twoFactor || false} onChange={(e) => setLocalSettings({...localSettings, security: {...localSettings.security, twoFactor: e.target.checked}})} className="sr-only peer" />
+                          <div className="w-11 h-6 bg-gray-200 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                         </label>
                     </div>
 
@@ -288,18 +342,9 @@ export const Settings: React.FC<SettingsProps> = ({
                         <div className="flex flex-col gap-4 p-6 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30">
                            <div>
                                <span className="font-bold text-gray-900 dark:text-white block">Resetar e Inicializar Banco (Admin)</span>
-                               <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                                   Esta ação apagará permanentemente todos os dados atuais do Supabase e restaurará as configurações e usuários padrão de fábrica. Use com extrema cautela.
-                               </p>
+                               <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Apagará permanentemente todos os dados atuais do Supabase.</p>
                            </div>
-                           <button 
-                               onClick={() => {
-                                   if(confirm('CUIDADO: Isso apagará TODOS os seus dados atuais no banco de dados e restaurará o estado inicial. Deseja prosseguir?')) {
-                                       onResetApp();
-                                   }
-                               }}
-                               className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-500/20 transition-all"
-                           >
+                           <button onClick={onResetApp} className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition-all">
                                <RefreshCw size={18} /> Resetar e Inicializar Banco (Admin)
                            </button>
                         </div>

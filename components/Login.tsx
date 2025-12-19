@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, SystemSettings } from '../types';
-import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface LoginProps {
   users: User[];
@@ -11,8 +11,9 @@ interface LoginProps {
 }
 
 export const Login: React.FC<LoginProps> = ({ users, onLogin, settings, onSystemInit }) => {
-  const [email, setEmail] = useState('studiojpgloria@gmail.com');
-  const [password, setPassword] = useState('password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -37,7 +38,6 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings, onSystem
     }, 800);
   };
 
-  // Garante valores seguros mesmo se o objeto loginScreen estiver ausente
   const loginTitle = settings?.loginScreen?.title || 'Nexus Gestão';
   const loginSubtitle = settings?.loginScreen?.subtitle || 'Acesse o painel administrativo.';
   const themeColor = settings?.themeColor || 'indigo';
@@ -73,6 +73,7 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings, onSystem
                       onChange={(e) => setEmail(e.target.value)}
                       className={`w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 transition-all`}
                       placeholder="seu@email.com"
+                      autoComplete="email"
                     />
                  </div>
               </div>
@@ -82,12 +83,21 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings, onSystem
                  <div className="relative">
                     <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                     <input 
-                      type="password" 
+                      type={showPassword ? "text" : "password"}
                       value={password}
+                      required
                       onChange={(e) => setPassword(e.target.value)}
-                      className={`w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 transition-all`}
+                      className={`w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-${themeColor}-500 focus:border-${themeColor}-500 transition-all`}
                       placeholder="••••••••"
+                      autoComplete="current-password"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+                    >
+                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
                  </div>
               </div>
 
