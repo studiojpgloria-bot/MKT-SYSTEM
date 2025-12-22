@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, CheckSquare } from 'lucide-react';
+import { Plus, Clock, AlertTriangle, Paperclip, Search, Filter, X, CheckSquare, Lock } from 'lucide-react';
 import { Task, TaskPriority, User, WorkflowStage, UserRole } from '../types';
 
 interface KanbanBoardProps {
@@ -114,6 +114,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   });
 
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    const isMember = currentUser.role === UserRole.MEMBER;
+
+    // Regra de bloqueio: Membro não pode mover tarefa se estiver em revisão ou já aprovada
+    if (isMember && (task?.stage === 'review' || task?.stage === 'approved' || task?.stage === 'published')) {
+      e.preventDefault();
+      return;
+    }
+
     setDraggedTaskId(taskId);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -125,13 +134,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   const handleDrop = (e: React.DragEvent, stageId: string) => {
     e.preventDefault();
-    if (draggedTaskId) {
-      onUpdateTask(draggedTaskId, { stage: stageId });
-      setDraggedTaskId(null);
-    }
-  };
+    if (!draggedTaskId) return;
 
-  const canEdit = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER;
+    const isMember = currentUser.role === UserRole.MEMBER;
+    
+    // Travas de segurança para Membros
+    if (isMember) {
+      // Impede membro de mover para colunas finais manualmente
+      if (stageId === 'approved' || stageId === 'published') {
+        setDraggedTaskId(null);
+        return;
+      }
+    }
+
+    onUpdateTask(draggedTaskId, { stage: stageId });
+    setDraggedTaskId(null);
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -215,15 +233,23 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   const assignee = users.find(u => u.id === task.assigneeId);
                   const completedSubtasks = task.subtasks?.filter(st => st.completed).length || 0;
                   const totalSubtasks = task.subtasks?.length || 0;
+                  const isLocked = currentUser.role === UserRole.MEMBER && (task.stage === 'review' || task.stage === 'approved' || task.stage === 'published');
 
                   return (
                     <div
                       key={task.id}
-                      draggable
+                      draggable={!isLocked}
                       onDragStart={(e) => handleDragStart(e, task.id)}
                       onClick={() => onTaskClick(task.id)}
-                      className="bg-white dark:bg-[#1e232d] p-4 rounded-2xl shadow-sm border border-gray-200 dark:border-[#2a303c]/50 hover:border-[#3b82f6]/50 cursor-grab active:cursor-grabbing transition-all group relative"
+                      className={`bg-white dark:bg-[#1e232d] p-4 rounded-2xl shadow-sm border transition-all group relative ${isLocked ? 'opacity-80 cursor-default border-transparent' : 'border-gray-200 dark:border-[#2a303c]/50 hover:border-[#3b82f6]/50 cursor-grab active:cursor-grabbing'}`}
                     >
+                      {/* Lock Icon for status integrity */}
+                      {isLocked && (
+                          <div className="absolute top-4 right-4 text-gray-500">
+                              <Lock size={12} />
+                          </div>
+                      )}
+
                       {/* Top Row */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2">
@@ -231,7 +257,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                               {task.priority}
                             </span>
                             <span className="text-[10px] font-mono text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-[#151a21] px-1.5 rounded border border-gray-200 dark:border-[#2a303c]">
-                                #{task.id}
+                                #{task.id.slice(-4)}
                             </span>
                         </div>
                       </div>
@@ -242,16 +268,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       <p className="text-xs text-gray-500 line-clamp-2 mb-4">
                           {task.description}
                       </p>
-
-                      {task.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-4">
-                           {task.tags.slice(0, 3).map(tag => (
-                            <span key={tag} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-gray-50 dark:bg-[#151a21] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#2a303c]">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
 
                       <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-[#2a303c]">
                           <div className="flex items-center gap-3">
@@ -287,15 +303,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   );
                 })}
                 
-                {canEdit && (
-                  <button 
-                    onClick={() => onNewTask(stage.id)}
-                    className="w-full py-3 rounded-2xl border border-dashed border-gray-300 dark:border-[#2a303c] text-gray-400 dark:text-gray-500 hover:border-[#3b82f6] hover:text-[#3b82f6] flex items-center justify-center gap-2 text-sm transition-all"
-                  >
-                    <Plus size={16} />
-                    Adicionar Tarefa
-                  </button>
-                )}
+                <button 
+                  onClick={() => onNewTask(stage.id)}
+                  className="w-full py-3 rounded-2xl border border-dashed border-gray-300 dark:border-[#2a303c] text-gray-400 dark:text-gray-500 hover:border-[#3b82f6] hover:text-[#3b82f6] flex items-center justify-center gap-2 text-sm transition-all"
+                >
+                  <Plus size={16} />
+                  Adicionar Tarefa
+                </button>
               </div>
             </div>
           );

@@ -119,6 +119,7 @@ export interface Task {
   comments: Comment[];
   timeSpent: number; // in minutes
   accepted: boolean;
+  finalLink?: string; // Link for high-res final project download
 }
 
 export interface CalendarEvent {
@@ -127,10 +128,13 @@ export interface CalendarEvent {
   description?: string;
   start: number;
   end: number;
+  allDay?: boolean;
+  recurring?: boolean;
   type: 'meeting' | 'deadline' | 'campaign';
   platform?: 'Google Meet' | 'Zoom' | 'Teams';
   meetingLink?: string;
   taskId?: string;
+  attendeeIds?: string[]; // IDs of users mentioned in the event
 }
 
 export interface DashboardMetrics {

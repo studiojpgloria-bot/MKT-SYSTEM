@@ -1,6 +1,5 @@
-
 <!DOCTYPE html>
-<html lang="pt-BR" class="dark">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -30,10 +29,6 @@
       }
     </script>
     <style>
-      body {
-        background-color: #0b0e11;
-        font-family: 'Poppins', sans-serif;
-      }
       .hide-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -46,14 +41,20 @@
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #0b0e11; 
+        background: transparent; 
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #0b0e11;
       }
       ::-webkit-scrollbar-thumb {
-        background: #2a303c; 
+        background: #cbd5e1; 
         border-radius: 4px;
       }
+      .dark ::-webkit-scrollbar-thumb {
+        background: #2a303c;
+      }
       ::-webkit-scrollbar-thumb:hover {
-        background: #3b4252; 
+        background: #94a3b8; 
       }
     </style>
   <script type="importmap">
@@ -71,7 +72,7 @@
 }
 </script>
 </head>
-  <body class="bg-[#0b0e11] text-white">
+  <body class="bg-gray-50 dark:bg-[#0b0e11] text-slate-900 dark:text-white transition-colors duration-300">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   </body>

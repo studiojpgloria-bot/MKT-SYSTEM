@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Check, Trash2, Moon, Sun, Search, FileText, Network, UploadCloud } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Moon, Sun, FileText, ShieldCheck } from 'lucide-react';
 import { User, UserRole, SystemSettings, Notification } from '../types';
 
 interface LayoutProps {
@@ -35,7 +35,17 @@ export const Layout: React.FC<LayoutProps> = ({
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-  const themeColor = settings.themeColor;
+
+  const themeColors: any = {
+    indigo: { text: 'text-indigo-600', bg: 'bg-indigo-600', border: 'border-indigo-600', shadow: 'shadow-indigo-500/20', hover: 'hover:bg-indigo-700', fill: 'fill-indigo-600' },
+    emerald: { text: 'text-emerald-600', bg: 'bg-emerald-600', border: 'border-emerald-600', shadow: 'shadow-emerald-500/20', hover: 'hover:bg-emerald-700', fill: 'fill-emerald-600' },
+    rose: { text: 'text-rose-600', bg: 'bg-rose-600', border: 'border-rose-600', shadow: 'shadow-rose-500/20', hover: 'hover:bg-rose-700', fill: 'fill-rose-600' },
+    blue: { text: 'text-blue-600', bg: 'bg-blue-600', border: 'border-blue-600', shadow: 'shadow-blue-500/20', hover: 'hover:bg-blue-700', fill: 'fill-blue-600' },
+    violet: { text: 'text-violet-600', bg: 'bg-violet-600', border: 'border-violet-600', shadow: 'shadow-violet-500/20', hover: 'hover:bg-violet-700', fill: 'fill-violet-600' },
+    orange: { text: 'text-orange-600', bg: 'bg-orange-600', border: 'border-orange-600', shadow: 'shadow-orange-500/20', hover: 'hover:bg-orange-700', fill: 'fill-orange-600' },
+  };
+
+  const activeTheme = themeColors[settings.themeColor] || themeColors.indigo;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -56,7 +66,6 @@ export const Layout: React.FC<LayoutProps> = ({
     { id: 'documents', label: 'Documentos', icon: FileText, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },
     { id: 'approvals', label: 'Aprovações', icon: CheckCircle, roles: [UserRole.ADMIN, UserRole.MANAGER] },
     { id: 'reports', label: 'Relatórios', icon: FileBarChart, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-    { id: 'import', label: 'Importar Nifty', icon: UploadCloud, roles: [UserRole.ADMIN, UserRole.MANAGER] },
     { id: 'settings', label: 'Configurações', icon: Settings, roles: [UserRole.ADMIN] },
   ];
 
@@ -67,9 +76,8 @@ export const Layout: React.FC<LayoutProps> = ({
           case 'calendar': return 'Calendário';
           case 'documents': return 'Documentos & Atas';
           case 'approvals': return 'Central de Aprovações';
-          case 'reports': return 'Relatórios';
-          case 'import': return 'Importar Dados (Nifty)';
-          case 'settings': return 'Configurações';
+          case 'reports': return 'Relatórios de Performance';
+          case 'settings': return 'Configurações do Sistema';
           default: return view.charAt(0).toUpperCase() + view.slice(1);
       }
   };
@@ -86,13 +94,13 @@ export const Layout: React.FC<LayoutProps> = ({
           {isSidebarOpen && (
             <div className="flex items-center gap-3">
                {settings.companyLogo ? (
-                 <img src={settings.companyLogo} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
+                 <img src={settings.companyLogo} alt="Logo" className="w-9 h-9 rounded-xl object-contain" />
                ) : (
-                 <div className={`w-8 h-8 rounded-full bg-gradient-to-tr from-${themeColor}-600 to-${themeColor}-400 flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.4)]`}>
-                    <span className="font-bold text-white text-sm">{settings.companyName.charAt(0)}</span>
+                 <div className={`w-9 h-9 rounded-xl ${activeTheme.bg} flex items-center justify-center shadow-lg ${activeTheme.shadow}`}>
+                    <ShieldCheck size={20} className="text-white" />
                  </div>
                )}
-               <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white truncate">{settings.companyName.split(' ')[0]}</span>
+               <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white truncate">{settings.companyName}</span>
             </div>
           )}
           <button
@@ -116,11 +124,8 @@ export const Layout: React.FC<LayoutProps> = ({
                     : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#151a21]/50'
                 }`}
               >
-                <item.icon size={20} className={`${currentView === item.id ? `text-${themeColor}-500` : 'text-gray-500 group-hover:text-gray-400 dark:group-hover:text-gray-300'}`} />
+                <item.icon size={20} className={`${currentView === item.id ? activeTheme.text : 'text-gray-500 group-hover:text-gray-400 dark:group-hover:text-gray-300'}`} />
                 {isSidebarOpen && <span className="font-medium text-sm">{item.label}</span>}
-                {isSidebarOpen && currentView === item.id && (
-                    <div className={`ml-auto w-1.5 h-1.5 rounded-full bg-${themeColor}-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]`}></div>
-                )}
               </button>
             ))}
         </div>
@@ -128,18 +133,18 @@ export const Layout: React.FC<LayoutProps> = ({
         <div className="p-6">
           {isSidebarOpen ? (
              <div className="bg-gray-50 dark:bg-[#151a21] rounded-3xl p-4 flex items-center gap-3 border border-gray-200 dark:border-[#2a303c]/50">
-                <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11]" />
+                <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11] cursor-pointer" onClick={onOpenProfile} />
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{currentUser.name}</p>
-                    <p className="text-xs text-gray-500 capitalize">{currentUser.role.toLowerCase()}</p>
+                    <p className={`text-[10px] ${activeTheme.text} font-bold uppercase`}>{currentUser.role.toLowerCase()}</p>
                 </div>
-                <button onClick={onLogout} className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" title="Sair">
+                <button onClick={onLogout} className="text-gray-400 hover:text-red-500 transition-colors" title="Sair">
                     <LogOut size={16} />
                 </button>
              </div>
           ) : (
              <div className="flex justify-center">
-                 <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11]" />
+                 <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11] cursor-pointer" onClick={onOpenProfile} />
              </div>
           )}
         </div>
@@ -148,77 +153,56 @@ export const Layout: React.FC<LayoutProps> = ({
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-gray-50 dark:bg-[#0b0e11] transition-colors duration-300">
         {/* Header */}
-        <header className="h-20 flex items-center justify-between px-8 flex-shrink-0 bg-gray-50 dark:bg-[#0b0e11] transition-colors duration-300">
+        <header className="h-20 flex items-center justify-between px-8 flex-shrink-0 bg-gray-50 dark:bg-[#0b0e11] border-b border-gray-100 dark:border-[#2a303c]/50 transition-colors duration-300">
             <div className="flex flex-col">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white capitalize flex items-center gap-2">
+                <h1 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
                     {getViewTitle(currentView)}
                 </h1>
-                {currentView === 'dashboard' && <p className="text-sm text-gray-500">Aqui está o que está acontecendo na sua loja este mês.</p>}
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{currentUser.role} Access</p>
             </div>
 
             <div className="flex items-center gap-6">
-                <div className="relative hidden md:block">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-                    <input 
-                        type="text" 
-                        placeholder="Pesquisar..." 
-                        className="bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] text-sm text-gray-900 dark:text-white rounded-full pl-11 pr-4 py-2.5 w-64 focus:outline-none focus:border-[#3b82f6] transition-colors placeholder-gray-400 dark:placeholder-gray-500"
-                    />
-                </div>
-
                 <button 
                   onClick={onToggleTheme}
-                  className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-500 transition-all"
+                  className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-indigo-500 transition-all"
                 >
-                   {settings.darkMode ? <Moon size={18} /> : <Sun size={18} />}
+                   {settings.darkMode ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
 
                 <div className="relative" ref={notifRef}>
                     <button 
-                      className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-gray-900 dark:hover:text-white hover:border-gray-300 dark:hover:border-gray-500 transition-all relative"
+                      className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 transition-all relative group"
                       onClick={() => setIsNotifOpen(!isNotifOpen)}
                     >
-                        <Bell size={18} />
+                        <Bell size={18} className={`group-hover:${activeTheme.text}`} />
                         {unreadCount > 0 && (
-                            <span className={`absolute top-0 right-0 w-3 h-3 bg-${themeColor}-500 rounded-full border-2 border-white dark:border-[#0b0e11]`}></span>
+                            <span className={`absolute top-1 right-1 w-2.5 h-2.5 ${activeTheme.bg} rounded-full border-2 border-white dark:border-[#0b0e11]`}></span>
                         )}
                     </button>
 
                     {isNotifOpen && (
                       <div className="absolute right-0 top-14 w-80 bg-white dark:bg-[#151a21] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#2a303c] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                         <div className="p-4 border-b border-gray-200 dark:border-[#2a303c] flex items-center justify-between">
+                         <div className="p-4 border-b border-gray-200 dark:border-[#2a303c] flex items-center justify-between bg-gray-50 dark:bg-[#0b0e11]">
                             <h3 className="font-bold text-gray-900 dark:text-white text-sm">Notificações</h3>
-                            {notifications.length > 0 && (
-                                <button 
-                                  onClick={onClearNotifications} 
-                                  className="text-xs text-gray-400 hover:text-gray-900 dark:hover:text-white flex items-center gap-1"
-                                >
-                                  <Trash2 size={12} /> Limpar
-                                </button>
-                            )}
+                            <button onClick={onClearNotifications} className={`text-[10px] font-black uppercase ${activeTheme.text}`}>Limpar</button>
                          </div>
-                         <div className="max-h-80 overflow-y-auto">
+                         <div className="max-h-80 overflow-y-auto custom-scrollbar">
                             {notifications.length === 0 ? (
-                                <div className="p-8 text-center text-gray-500 text-sm">
-                                    Sem notificações
-                                </div>
+                                <div className="p-8 text-center text-gray-500 text-xs">Sem notificações recentes</div>
                             ) : (
                                 notifications.map(n => (
                                   <div 
                                     key={n.id} 
-                                    onClick={() => {
-                                        onNotificationClick(n);
-                                        setIsNotifOpen(false);
-                                    }}
-                                    className={`p-3 border-b border-gray-100 dark:border-[#2a303c] hover:bg-gray-50 dark:hover:bg-[#1e232d] cursor-pointer transition-colors ${!n.read ? 'bg-gray-50 dark:bg-[#1e232d]/50' : ''}`}
+                                    onClick={() => { onNotificationClick(n); setIsNotifOpen(false); }}
+                                    className={`p-4 border-b border-gray-100 dark:border-[#2a303c] hover:bg-gray-50 dark:hover:bg-[#1e232d] cursor-pointer transition-colors ${!n.read ? `bg-${settings.themeColor}-500/5` : ''}`}
                                   >
                                       <div className="flex justify-between items-start mb-1">
-                                          <span className={`text-xs font-bold ${n.type === 'error' ? 'text-red-500 dark:text-red-400' : n.type === 'success' ? 'text-green-500 dark:text-green-400' : 'text-gray-900 dark:text-white'}`}>
+                                          <span className={`text-[10px] font-black uppercase ${n.type === 'error' ? 'text-red-500' : n.type === 'warning' ? 'text-amber-500' : activeTheme.text}`}>
                                             {n.title}
                                           </span>
-                                          <span className="text-[10px] text-gray-500">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                                          <span className="text-[10px] text-gray-500 font-bold">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                                       </div>
-                                      <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{n.message}</p>
+                                      <p className="text-xs text-gray-700 dark:text-gray-400 font-medium leading-relaxed">{n.message}</p>
                                   </div>
                                 ))
                             )}
@@ -227,26 +211,18 @@ export const Layout: React.FC<LayoutProps> = ({
                     )}
                 </div>
 
+                <div className="h-8 w-px bg-gray-200 dark:bg-[#2a303c]"></div>
+
                 <button 
-                    onClick={onOpenProfile}
-                    className="w-10 h-10 rounded-full overflow-hidden border border-gray-200 dark:border-[#2a303c] hover:ring-2 hover:ring-[#3b82f6] transition-all cursor-pointer"
-                    title="Editar Perfil"
+                    onClick={onNewTask}
+                    className={`${activeTheme.bg} ${activeTheme.hover} text-white px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg ${activeTheme.shadow} active:scale-95`}
                 >
-                    <img src={currentUser.avatar} alt="User" className="w-full h-full object-cover"/>
+                    + Nova Tarefa
                 </button>
-                
-                {(currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER) && (
-                    <button 
-                        onClick={onNewTask}
-                        className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-5 py-2.5 rounded-full text-sm font-medium transition-all shadow-[0_0_15px_rgba(79,70,229,0.3)]`}
-                    >
-                        + Nova Tarefa
-                    </button>
-                )}
             </div>
         </header>
 
-        <div className="flex-1 overflow-auto p-8 pt-4">
+        <div className="flex-1 overflow-auto p-8 pt-4 custom-scrollbar">
             {children}
         </div>
       </main>

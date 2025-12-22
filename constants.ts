@@ -22,7 +22,7 @@ export const INITIAL_SETTINGS: SystemSettings = {
     companyName: 'Nexus Marketing',
     companyLogo: '',
     themeColor: 'indigo',
-    darkMode: true,
+    darkMode: false,
     notifications: {
         email: true,
         push: true,

@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Save, User as UserIcon, Building, Palette, Shield, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon, ArrowRight, Upload, X, Key, Edit, Eye, EyeOff, Moon, Sun } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Save, User as UserIcon, Building, Palette, Shield, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon, Upload, Moon, Sun, ShieldCheck, Monitor, Lock, ChevronDown, Key, UserCircle, Globe } from 'lucide-react';
 import { SystemSettings, User, UserRole, WorkflowStage, Task } from '../types';
 
 interface SettingsProps {
@@ -27,13 +27,33 @@ export const Settings: React.FC<SettingsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'company' | 'team' | 'workflow' | 'appearance' | 'security' | 'login'>('company');
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
+  const [localWorkflow, setLocalWorkflow] = useState<WorkflowStage[]>(workflow);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: UserRole.MEMBER, password: '' });
-  const [newStage, setNewStage] = useState('');
   
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const bannerInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setLocalWorkflow(workflow);
+  }, [workflow]);
+
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
 
   const handleSaveSettings = () => onUpdateSettings(localSettings);
+  
+  const handleSaveWorkflow = () => onUpdateWorkflow(localWorkflow);
+
+  const themeColors = {
+    indigo: { text: 'text-indigo-600', bg: 'bg-indigo-600', border: 'border-indigo-600', ring: 'focus:ring-indigo-500', shadow: 'shadow-indigo-600/20', light: 'bg-indigo-50', hover: 'hover:bg-indigo-700' },
+    emerald: { text: 'text-emerald-600', bg: 'bg-emerald-600', border: 'border-emerald-600', ring: 'focus:ring-emerald-500', shadow: 'shadow-emerald-600/20', light: 'bg-emerald-50', hover: 'hover:bg-emerald-700' },
+    rose: { text: 'text-rose-600', bg: 'bg-rose-600', border: 'border-rose-600', ring: 'focus:ring-rose-500', shadow: 'shadow-rose-600/20', light: 'bg-rose-50', hover: 'hover:bg-rose-700' },
+    blue: { text: 'text-blue-600', bg: 'bg-blue-600', border: 'border-blue-600', ring: 'focus:ring-blue-500', shadow: 'shadow-blue-600/20', light: 'bg-blue-50', hover: 'hover:bg-blue-700' },
+    violet: { text: 'text-violet-600', bg: 'bg-violet-600', border: 'border-violet-600', ring: 'focus:ring-violet-500', shadow: 'shadow-violet-600/20', light: 'bg-violet-50', hover: 'hover:bg-violet-700' },
+    orange: { text: 'text-orange-600', bg: 'bg-orange-600', border: 'border-orange-600', ring: 'focus:ring-orange-500', shadow: 'shadow-orange-600/20', light: 'bg-orange-50', hover: 'hover:bg-orange-700' },
+  };
+
+  const activeTheme = themeColors[localSettings.themeColor] || themeColors.indigo;
 
   const handleAddUser = () => {
     if (newUser.name && newUser.email && newUser.password) {
@@ -43,7 +63,7 @@ export const Settings: React.FC<SettingsProps> = ({
         email: newUser.email,
         role: newUser.role,
         password: newUser.password,
-        avatar: `https://ui-avatars.com/api/?name=${newUser.name.replace(' ', '+')}&background=random`,
+        avatar: `https://ui-avatars.com/api/?name=${newUser.name.replace(' ', '+')}&background=6366f1&color=fff`,
         status: 'offline',
         lastSeen: Date.now()
       };
@@ -52,310 +72,292 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  const handleUpdateUserRole = (id: string, newRole: UserRole) => {
+    onUpdateUsers(users.map(u => u.id === id ? { ...u, role: newRole } : u));
+  };
+
   const handleRemoveUser = (id: string) => {
-    if (id === currentUser.id) {
-        alert("Você não pode remover a si mesmo do sistema.");
-        return;
-    }
-    if (confirm("Deseja realmente remover este membro da equipe?")) {
+    if (id === currentUser.id) return alert("Você não pode remover a si mesmo.");
+    if (confirm("Deseja realmente remover este membro?")) {
         onUpdateUsers(users.filter(u => u.id !== id));
     }
   };
 
-  const handleAddStage = () => {
-    if (newStage) {
-      const stage: WorkflowStage = { id: newStage.toLowerCase().replace(/\s+/g, '_'), name: newStage, color: 'indigo' };
-      onUpdateWorkflow([...workflow, stage]);
-      setNewStage('');
+  const handleUpdateWorkflowStage = (id: string, name: string) => {
+    setLocalWorkflow(prev => prev.map(s => s.id === id ? { ...s, name } : s));
+  };
+
+  const handleDeleteWorkflowStage = (id: string) => {
+    if (localWorkflow.length <= 1) return alert("O sistema precisa de pelo menos uma etapa.");
+    if (confirm("Deseja excluir esta etapa? Isso pode afetar tarefas vinculadas.")) {
+      setLocalWorkflow(prev => prev.filter(s => s.id !== id));
     }
   };
 
-  const handleRemoveStage = (id: string) => {
-    if (workflow.length <= 3) return alert('Mínimo de 3 etapas necessário.');
-    onUpdateWorkflow(workflow.filter(s => s.id !== id));
-  };
-
-  // Added handler to fix missing handleStageNameChange reference
-  const handleStageNameChange = (id: string, newName: string) => {
-    onUpdateWorkflow(workflow.map(s => s.id === id ? { ...s, name: newName } : s));
-  };
-
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setLocalSettings({ ...localSettings, companyLogo: event.target?.result as string });
+  const handleAddWorkflowStage = () => {
+    const name = prompt("Nome da nova etapa:");
+    if (name) {
+      const newStage: WorkflowStage = {
+        id: `stage-${Date.now()}`,
+        name,
+        color: 'gray'
       };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setLocalSettings({ 
-          ...localSettings, 
-          loginScreen: { ...localSettings.loginScreen, bannerUrl: event.target?.result as string } 
-        });
-      };
-      reader.readAsDataURL(file);
+      setLocalWorkflow([...localWorkflow, newStage]);
     }
   };
 
   const TabButton = ({ id, label, icon: Icon }: any) => (
     <button
       onClick={() => setActiveTab(id)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-        activeTab === id ? `bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300` : 'text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-800'
+      className={`w-full flex items-center gap-3 px-6 py-4 rounded-xl text-sm font-bold transition-all ${
+        activeTab === id ? `${activeTheme.light} ${activeTheme.text} dark:bg-white/10 dark:text-white` : 'text-slate-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-white'
       }`}
     >
       <Icon size={18} /> {label}
     </button>
   );
 
-  const colors = [
-    { id: 'indigo', hex: '#4f46e5' },
-    { id: 'blue', hex: '#2563eb' },
-    { id: 'emerald', hex: '#10b981' },
-    { id: 'rose', hex: '#f43f5e' },
-    { id: 'violet', hex: '#8b5cf6' },
-    { id: 'orange', hex: '#f59e0b' },
-  ];
+  const AutomationCard = ({ label, value, field }: { label: string, value: string, field: keyof typeof localSettings.workflowRules }) => (
+    <div className="bg-white dark:bg-[#151a21] p-6 rounded-2xl border border-slate-200 dark:border-[#2a303c] space-y-4 shadow-sm transition-colors">
+        <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest">{label}</label>
+        <div className="relative group">
+            <select 
+                value={value}
+                onChange={(e) => setLocalSettings({...localSettings, workflowRules: {...localSettings.workflowRules, [field]: e.target.value}})}
+                className={`w-full p-4 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-xl text-sm font-bold text-slate-700 dark:text-white outline-none appearance-none focus:ring-1 ${activeTheme.ring}`}
+            >
+                {localWorkflow.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-gray-600" />
+        </div>
+    </div>
+  );
+
+  const SaveButton = ({ onClick }: { onClick: () => void }) => (
+    <button 
+      onClick={onClick}
+      className={`flex items-center gap-3 px-10 py-5 ${activeTheme.bg} text-white rounded-[24px] font-black shadow-lg ${activeTheme.shadow} text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 mt-10 self-end`}
+    >
+      <Save size={18} /> SALVAR ALTERAÇÕES
+    </button>
+  );
 
   return (
-    <div className="max-w-6xl mx-auto bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-200 dark:border-slate-800 overflow-hidden flex h-[calc(100vh-8rem)] min-h-[600px]">
-      <div className="w-64 bg-gray-50 dark:bg-slate-950 p-6 border-r border-gray-200 dark:border-slate-800 flex-shrink-0 overflow-y-auto">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-6">Configurações</h2>
-        <nav className="space-y-1">
-          <TabButton id="company" label="Empresa e Perfil" icon={Building} />
-          <TabButton id="team" label="Gestão da Equipe" icon={UserIcon} />
-          <TabButton id="workflow" label="Config. Workflow" icon={Layout} />
-          <TabButton id="appearance" label="Aparência" icon={Palette} />
-          <TabButton id="login" label="Tela de Login" icon={ImageIcon} />
-          <TabButton id="security" label="Segurança e Dados" icon={Shield} />
-        </nav>
-      </div>
+    <div className="max-w-7xl mx-auto bg-white dark:bg-[#151a21] rounded-[40px] shadow-2xl border border-slate-200 dark:border-[#2a303c] overflow-hidden flex flex-col h-[85vh] transition-colors duration-300">
+      <div className="flex-1 flex overflow-hidden">
+        {/* Sidebar */}
+        <div className="w-72 bg-slate-50 dark:bg-[#0b0e11] p-8 border-r border-slate-200 dark:border-[#2a303c] flex-shrink-0 overflow-y-auto custom-scrollbar transition-colors">
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-10 tracking-tight">Configurações</h2>
+          <nav className="space-y-2">
+            <TabButton id="company" label="Empresa e Perfil" icon={Building} />
+            <TabButton id="team" label="Gestão da Equipe" icon={UserIcon} />
+            <TabButton id="workflow" label="Config. Workflow" icon={Layout} />
+            <TabButton id="appearance" label="Aparência" icon={Palette} />
+            <TabButton id="login" label="Tela de Login" icon={ImageIcon} />
+            <TabButton id="security" label="Segurança e Dados" icon={Shield} />
+          </nav>
+        </div>
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto p-8 bg-white dark:bg-slate-900">
-          {activeTab === 'company' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">Informações da Empresa</h3>
-              <div className="grid grid-cols-1 gap-6 max-w-xl">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Nome da Empresa</label>
-                  <input type="text" value={localSettings.companyName} onChange={(e) => setLocalSettings({...localSettings, companyName: e.target.value})} className="w-full p-2 border border-gray-300 bg-white text-gray-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-indigo-500" />
-                </div>
-                <div>
-                   <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Logotipo da Empresa</label>
-                   <div className="flex gap-4 items-center mt-2">
-                      <div className="w-20 h-20 rounded-lg bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden shrink-0">
-                          {localSettings.companyLogo ? (
-                              <img src={localSettings.companyLogo} alt="Logo" className="w-full h-full object-contain p-2" />
-                          ) : (
-                              <Building size={32} className="text-gray-400" />
-                          )}
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
-                        <button onClick={() => logoInputRef.current?.click()} className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2">
-                          <Upload size={16} /> Fazer Upload
-                        </button>
-                      </div>
-                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'appearance' && (
-            <div className="space-y-8 animate-in fade-in duration-300">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">Aparência do Sistema</h3>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-4">Cor de Destaque</label>
-                  <div className="flex gap-4">
-                    {colors.map((c) => (
-                      <button 
-                        key={c.id} 
-                        onClick={() => setLocalSettings({...localSettings, themeColor: c.id as any})}
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all border-4 ${localSettings.themeColor === c.id ? 'border-indigo-500 scale-110' : 'border-transparent'}`}
-                        style={{ backgroundColor: c.hex }}
-                      >
-                        {localSettings.themeColor === c.id && <Check className="text-white" size={24} />}
-                      </button>
-                    ))}
+        {/* Content Area */}
+        <div className="flex-1 overflow-y-auto p-12 bg-white dark:bg-[#151a21] custom-scrollbar flex flex-col transition-colors">
+            {activeTab === 'company' && (
+              <div className="space-y-8 animate-in fade-in duration-300 flex flex-col">
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Empresa e Perfil</h3>
+                <div className="grid grid-cols-1 gap-8 max-w-2xl">
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3">Nome da Empresa</label>
+                    <input type="text" value={localSettings.companyName} onChange={(e) => setLocalSettings({...localSettings, companyName: e.target.value})} className={`w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-slate-900 dark:text-white rounded-2xl outline-none font-bold focus:ring-2 ${activeTheme.ring}`} />
                   </div>
-                </div>
-
-                <div className="max-w-md p-6 bg-gray-50 dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                        {localSettings.darkMode ? <Moon size={18} /> : <Sun size={18} />} Modo Escuro
-                      </h4>
-                      <p className="text-xs text-gray-500">Alternar tema visual do sistema</p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input type="checkbox" checked={localSettings.darkMode} onChange={(e) => setLocalSettings({...localSettings, darkMode: e.target.checked})} className="sr-only peer" />
-                      <div className="w-11 h-6 bg-gray-200 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'login' && (
-             <div className="space-y-8 animate-in fade-in duration-300">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">Personalização da Entrada</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                   <div className="space-y-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Título da Tela</label>
-                        <input type="text" value={localSettings.loginScreen.title} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, title: e.target.value}})} className="w-full p-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Subtítulo</label>
-                        <textarea value={localSettings.loginScreen.subtitle} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, subtitle: e.target.value}})} className="w-full p-3 border border-gray-300 dark:border-slate-700 dark:bg-slate-800 dark:text-white rounded-xl resize-none" rows={3} />
-                      </div>
-                   </div>
-                   <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2">Banner Lateral</label>
-                      <div className="aspect-video w-full rounded-2xl bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 overflow-hidden relative group">
-                         {localSettings.loginScreen.bannerUrl ? (
-                            <img src={localSettings.loginScreen.bannerUrl} alt="Banner" className="w-full h-full object-cover" />
-                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400"><ImageIcon size={48} /></div>
-                         )}
-                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <input type="file" ref={bannerInputRef} className="hidden" accept="image/*" onChange={handleBannerUpload} />
-                            <button onClick={() => bannerInputRef.current?.click()} className="bg-white text-black px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-                               <Upload size={16} /> Trocar Imagem
-                            </button>
-                         </div>
-                      </div>
-                   </div>
-                </div>
-             </div>
-          )}
-
-          {activeTab === 'team' && (
-              <div className="space-y-6">
-                  <h3 className="text-lg font-bold dark:text-white">Equipe</h3>
-                  <div className="bg-[#151a21] p-6 rounded-2xl border border-[#2a303c] space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <input type="text" placeholder="Nome" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
-                          <input type="email" placeholder="Email" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
-                          <input type="password" placeholder="Senha" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm" />
-                          <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as any})} className="p-3 bg-[#0b0e11] border border-[#2a303c] rounded-xl text-sm">
-                              {Object.values(UserRole).map(r => <option key={r} value={r}>{r}</option>)}
-                          </select>
-                      </div>
-                      <button onClick={handleAddUser} className="w-full py-3 bg-indigo-600 text-white font-bold rounded-xl">Adicionar Membro</button>
-                  </div>
-                  <div className="space-y-2">
-                      {users.map(u => (
-                          <div key={u.id} className="flex items-center justify-between p-4 bg-[#151a21] rounded-xl border border-[#2a303c]">
-                              <div className="flex items-center gap-3">
-                                  <img src={u.avatar} className="w-10 h-10 rounded-full" />
-                                  <div><p className="font-bold text-white text-sm">{u.name}</p><p className="text-xs text-gray-500">{u.email}</p></div>
-                              </div>
-                              <button onClick={() => handleRemoveUser(u.id)} className="text-gray-500 hover:text-red-500"><Trash2 size={16}/></button>
-                          </div>
-                      ))}
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'workflow' && (
-             <div className="space-y-8 animate-in fade-in duration-300">
-                <div>
-                   <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-6">Etapas do Kanban</h3>
-                   <div className="space-y-3 max-w-2xl">
-                       {workflow.map((stage) => (
-                           <div key={stage.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg group">
-                               <GripVertical size={16} className="text-gray-400" />
-                               <input type="text" value={stage.name} onChange={(e) => handleStageNameChange(stage.id, e.target.value)} className="flex-1 bg-transparent font-medium dark:text-white outline-none" />
-                               <button onClick={() => handleRemoveStage(stage.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16} /></button>
-                           </div>
-                       ))}
-                       <div className="flex items-center gap-3 p-3 border-2 border-dashed border-gray-200 dark:border-slate-700 rounded-lg mt-4">
-                           <input type="text" value={newStage} onChange={(e) => setNewStage(e.target.value)} placeholder="Nova etapa..." className="flex-1 bg-transparent text-sm dark:text-white outline-none" />
-                           <button onClick={handleAddStage} className="text-sm font-bold text-indigo-600">Adicionar</button>
-                       </div>
-                   </div>
-                </div>
-
-                <div>
-                   <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Regras de Automação</h3>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
-                       {[
-                         { label: 'Ao Aceitar Tarefa', key: 'onAccept' },
-                         { label: 'Ao Enviar Entregável', key: 'onDeliverableUpload' },
-                         { label: 'Ao Aprovar', key: 'onApprove' },
-                         { label: 'Ao Rejeitar', key: 'onReject' }
-                       ].map(rule => (
-                        <div key={rule.key} className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-200 dark:border-slate-700">
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{rule.label}</label>
-                            <select 
-                                value={localSettings.workflowRules[rule.key as keyof typeof localSettings.workflowRules] || ''}
-                                onChange={(e) => setLocalSettings({...localSettings, workflowRules: {...localSettings.workflowRules, [rule.key]: e.target.value}})}
-                                className="w-full p-2 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-600 rounded-lg text-sm dark:text-white"
-                            >
-                                <option value="">Selecione...</option>
-                                {workflow.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3">Logotipo</label>
+                    <div className="flex gap-6 items-center">
+                        <div className="w-24 h-24 rounded-2xl bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] flex items-center justify-center overflow-hidden shadow-inner">
+                            {localSettings.companyLogo ? <img src={localSettings.companyLogo} className="w-full h-full object-contain p-3" /> : <ShieldCheck size={40} className="text-indigo-600/20" />}
                         </div>
-                       ))}
-                   </div>
+                        <button onClick={() => logoInputRef.current?.click()} className={`py-4 px-8 ${activeTheme.bg} text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg ${activeTheme.shadow} transition-all hover:scale-105 active:scale-95`}>Fazer Upload</button>
+                        <input type="file" ref={logoInputRef} className="hidden" accept="image/*" />
+                    </div>
+                  </div>
                 </div>
-             </div>
-          )}
+                <SaveButton onClick={handleSaveSettings} />
+              </div>
+            )}
 
-          {activeTab === 'security' && (
-             <div className="space-y-8 animate-in fade-in duration-300">
-                <h3 className="text-lg font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-slate-800 pb-4 mb-6">Segurança e Dados</h3>
-                
-                <div className="space-y-6 max-w-xl">
-                    <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800/50 rounded-xl border border-gray-200 dark:border-slate-700">
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <Shield size={18} className="text-gray-700 dark:text-slate-300" />
-                                <span className="font-bold text-gray-900 dark:text-white">Autenticação de Dois Fatores</span>
+            {activeTab === 'team' && (
+                <div className="space-y-12 animate-in fade-in duration-300 flex flex-col">
+                    <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Gestão da Equipe</h3>
+                    <div className="bg-slate-50 dark:bg-[#0b0e11] p-10 rounded-[40px] border border-slate-200 dark:border-[#2a303c] space-y-8 relative overflow-hidden group">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Nome</label>
+                                <input type="text" placeholder="Ex: João Paulo" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className={`w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-slate-900 dark:text-white outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-slate-400">Exigir verificação de código por email no login</p>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Email</label>
+                                <input type="email" placeholder="Ex: joao@nexus.com" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className={`w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-slate-900 dark:text-white outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Senha Inicial</label>
+                                <input type="password" placeholder="••••••••" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className={`w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-slate-900 dark:text-white outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Função</label>
+                                <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})} className={`w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-slate-900 dark:text-white outline-none font-bold appearance-none focus:ring-1 ${activeTheme.ring}`}>
+                                    <option value={UserRole.MEMBER}>Membro</option>
+                                    <option value={UserRole.MANAGER}>Gestor</option>
+                                    <option value={UserRole.ADMIN}>Administrador</option>
+                                </select>
+                            </div>
                         </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" checked={localSettings?.security?.twoFactor || false} onChange={(e) => setLocalSettings({...localSettings, security: {...localSettings.security, twoFactor: e.target.checked}})} className="sr-only peer" />
-                          <div className="w-11 h-6 bg-gray-200 dark:bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                        </label>
+                        <button onClick={handleAddUser} className={`w-full py-5 ${activeTheme.bg} text-white font-black rounded-2xl shadow-xl ${activeTheme.shadow} text-xs uppercase tracking-widest transition-all`}>
+                            ADICIONAR MEMBRO
+                        </button>
                     </div>
 
-                    <div className="mt-8 pt-6 border-t border-red-100 dark:border-red-900/30">
-                        <h4 className="text-red-600 font-bold flex items-center gap-2 mb-4">
-                           <AlertTriangle size={18} /> Zona de Perigo
-                        </h4>
-                        <div className="flex flex-col gap-4 p-6 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/30">
-                           <div>
-                               <span className="font-bold text-gray-900 dark:text-white block">Resetar e Inicializar Banco (Admin)</span>
-                               <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Apagará permanentemente todos os dados atuais do Supabase.</p>
-                           </div>
-                           <button onClick={onResetApp} className="w-full flex items-center justify-center gap-2 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition-all">
-                               <RefreshCw size={18} /> Resetar e Inicializar Banco (Admin)
-                           </button>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {users.map(u => (
+                            <div key={u.id} className={`p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] flex items-center gap-5 group relative hover:border-indigo-500/50 transition-all shadow-sm rounded-[32px]`}>
+                                <img src={u.avatar} className="w-16 h-16 rounded-full object-cover border-4 border-white dark:border-[#151a21] shadow-sm" alt={u.name} />
+                                <div className="flex-1 truncate">
+                                    <p className="font-black text-lg text-slate-900 dark:text-white truncate leading-tight">{u.name}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <select 
+                                            value={u.role}
+                                            onChange={(e) => handleUpdateUserRole(u.id, e.target.value as UserRole)}
+                                            className={`text-[10px] font-black ${activeTheme.text} bg-transparent border-none p-0 focus:ring-0 uppercase tracking-widest cursor-pointer hover:text-slate-800 dark:hover:text-white transition-colors`}
+                                        >
+                                            <option value={UserRole.ADMIN}>ADMIN</option>
+                                            <option value={UserRole.MANAGER}>MANAGER</option>
+                                            <option value={UserRole.MEMBER}>MEMBER</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button onClick={() => handleRemoveUser(u.id)} className="p-3 text-slate-400 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all absolute top-2 right-2"><Trash2 size={16} /></button>
+                            </div>
+                        ))}
                     </div>
+                    <SaveButton onClick={() => alert("Membros sincronizados automaticamente.")} />
                 </div>
-             </div>
-          )}
-      </div>
+            )}
 
-      <div className="p-6 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800 flex justify-end shrink-0">
-          <button onClick={handleSaveSettings} className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg font-bold shadow-md"><Save size={18} /> Salvar Alterações</button>
+            {activeTab === 'workflow' && (
+               <div className="space-y-12 animate-in fade-in duration-300 flex flex-col">
+                  <div>
+                    <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Regras de Automação</h3>
+                    <p className="text-slate-500 dark:text-gray-400 text-sm font-medium">Defina o comportamento automático das tarefas no sistema.</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <AutomationCard label="Ao Aceitar Tarefa" value={localSettings.workflowRules.onAccept} field="onAccept" />
+                      <AutomationCard label="Ao Enviar Entregável" value={localSettings.workflowRules.onDeliverableUpload} field="onDeliverableUpload" />
+                      <AutomationCard label="Ao Aprovar" value={localSettings.workflowRules.onApprove} field="onApprove" />
+                      <AutomationCard label="Ao Rejeitar" value={localSettings.workflowRules.onReject} field="onReject" />
+                  </div>
+
+                  <div className="pt-10 border-t border-slate-200 dark:border-[#2a303c]">
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-6 tracking-tight">Etapas do Workflow</h3>
+                    <div className="space-y-3 max-w-2xl">
+                       {localWorkflow.map((stage) => (
+                           <div key={stage.id} className="flex items-center gap-4 p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-[24px] group hover:border-indigo-500/30 transition-all shadow-sm">
+                               <GripVertical size={18} className="text-slate-400 dark:text-gray-600" />
+                               <input 
+                                  value={stage.name} 
+                                  onChange={(e) => handleUpdateWorkflowStage(stage.id, e.target.value)}
+                                  className="flex-1 font-black text-slate-700 dark:text-white text-sm bg-transparent border-none focus:ring-0"
+                               />
+                               <button onClick={() => handleDeleteWorkflowStage(stage.id)} className="text-slate-400 dark:text-gray-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
+                           </div>
+                       ))}
+                       <button onClick={handleAddWorkflowStage} className={`w-full p-6 border-2 border-dashed border-slate-300 dark:border-[#2a303c] rounded-[24px] text-slate-500 dark:text-gray-400 font-black text-xs uppercase tracking-widest hover:${activeTheme.text} hover:${activeTheme.border} transition-all bg-slate-50/50 dark:bg-white/5`}>
+                            + Adicionar nova etapa
+                       </button>
+                    </div>
+                  </div>
+                  <SaveButton onClick={handleSaveWorkflow} />
+               </div>
+            )}
+
+            {activeTab === 'appearance' && (
+                <div className="space-y-12 animate-in fade-in duration-300 flex flex-col">
+                    <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Aparência do Sistema</h3>
+                    <div className="grid grid-cols-1 gap-10 max-w-2xl">
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-6 block">Cor Temática</label>
+                            <div className="flex flex-wrap gap-4">
+                                {(['indigo', 'emerald', 'rose', 'blue', 'violet', 'orange'] as const).map(color => (
+                                    <button 
+                                        key={color} 
+                                        onClick={() => {
+                                          const newSettings = {...localSettings, themeColor: color};
+                                          setLocalSettings(newSettings);
+                                          onUpdateSettings(newSettings);
+                                        }}
+                                        className={`w-14 h-14 rounded-2xl transition-all border-4 ${localSettings.themeColor === color ? 'border-slate-900 dark:border-white scale-110 shadow-lg' : 'border-transparent opacity-60 hover:opacity-100'} bg-${color === 'emerald' ? 'emerald' : color === 'rose' ? 'rose' : color === 'violet' ? 'violet' : color === 'indigo' ? 'indigo' : color}-600`}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                        <div className="bg-slate-50 dark:bg-[#0b0e11] p-8 rounded-[32px] border border-slate-200 dark:border-[#2a303c] flex items-center justify-between shadow-sm transition-colors">
+                            <div>
+                                <h4 className="font-bold text-slate-900 dark:text-white">Tema Visual</h4>
+                                <p className="text-xs text-slate-500 dark:text-gray-400">Alternar entre modo claro e escuro em todo o sistema.</p>
+                            </div>
+                            <button 
+                                onClick={() => {
+                                  const newSettings = {...localSettings, darkMode: !localSettings.darkMode};
+                                  setLocalSettings(newSettings);
+                                  onUpdateSettings(newSettings);
+                                }}
+                                className={`w-14 h-8 rounded-full transition-all relative ${localSettings.darkMode ? activeTheme.bg : 'bg-slate-300'}`}
+                            >
+                                <div className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-sm transition-all ${localSettings.darkMode ? 'left-7' : 'left-1'}`} />
+                            </button>
+                        </div>
+                    </div>
+                    <SaveButton onClick={handleSaveSettings} />
+                </div>
+            )}
+
+            {activeTab === 'login' && (
+                <div className="space-y-12 animate-in fade-in duration-300 flex flex-col">
+                    <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Customização da Tela de Login</h3>
+                    <div className="grid grid-cols-1 gap-8 max-w-2xl">
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Título da Tela</label>
+                            <input type="text" value={localSettings.loginScreen.title} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, title: e.target.value}})} className={`w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-slate-900 dark:text-white rounded-2xl outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Subtítulo</label>
+                            <input type="text" value={localSettings.loginScreen.subtitle} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, subtitle: e.target.value}})} className={`w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-slate-900 dark:text-white rounded-2xl outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">URL do Banner Lateral</label>
+                            <input type="text" value={localSettings.loginScreen.bannerUrl} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, bannerUrl: e.target.value}})} className={`w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-slate-900 dark:text-white rounded-2xl outline-none font-bold placeholder:text-slate-300 dark:placeholder:text-gray-600 focus:ring-1 ${activeTheme.ring}`} placeholder="https://images.unsplash.com/..." />
+                        </div>
+                    </div>
+                    <SaveButton onClick={handleSaveSettings} />
+                </div>
+            )}
+
+            {activeTab === 'security' && (
+                <div className="space-y-12 animate-in fade-in duration-300 flex flex-col">
+                    <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Segurança e Dados</h3>
+                    <div className="max-w-2xl space-y-6">
+                        <div className="bg-red-50 dark:bg-red-900/5 p-10 rounded-[40px] border border-red-100 dark:border-red-900/20 space-y-6 shadow-sm">
+                            <div>
+                                <h4 className="text-xl font-black text-red-600 uppercase tracking-tight">Zona de Perigo</h4>
+                                <p className="text-sm text-red-800 dark:text-red-400 font-medium opacity-70">Ações irreversíveis para gerenciamento do sistema.</p>
+                            </div>
+                            <div className="flex flex-col gap-4">
+                                <button onClick={onResetApp} className="w-full py-4 bg-white dark:bg-[#0b0e11] text-red-600 border border-red-200 dark:border-red-900/30 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm">Limpar Banco de Dados</button>
+                                <button className="w-full py-4 bg-slate-200 dark:bg-white/5 text-slate-400 dark:text-gray-600 rounded-2xl text-xs font-black uppercase tracking-widest cursor-not-allowed">Exportar Todos os Dados (Em breve)</button>
+                            </div>
+                        </div>
+                    </div>
+                    <SaveButton onClick={() => alert("Configurações de segurança atualizadas.")} />
+                </div>
+            )}
+        </div>
       </div>
     </div>
   );
