@@ -12,7 +12,6 @@ export enum TaskPriority {
   URGENT = 'URGENT',
 }
 
-// Legacy enum kept for initial state, but app will use dynamic stages
 export enum TaskStage {
   BRIEFING = 'briefing',
   DESIGN = 'design',
@@ -24,19 +23,20 @@ export enum TaskStage {
 export interface WorkflowStage {
   id: string;
   name: string;
-  color: string; // hex or tailwind color name
+  color: string;
 }
 
 export interface WorkflowRules {
-  onAccept: string;         // Stage to move to when task is accepted
-  onDeliverableUpload: string; // Stage to move to when deliverable is uploaded (Review/Lock state)
-  onApprove: string;        // Stage to move to when approved
-  onReject: string;         // Stage to move to when rejected
+  onAccept: string;
+  onDeliverableUpload: string;
+  onApprove: string;
+  onReject: string;
 }
 
 export interface SystemSettings {
+  id?: string; // ID fixo para o singleton no banco
   companyName: string;
-  companyLogo: string; // URL
+  companyLogo: string;
   themeColor: 'indigo' | 'emerald' | 'rose' | 'blue' | 'violet' | 'orange';
   darkMode: boolean;
   notifications: {
@@ -46,7 +46,7 @@ export interface SystemSettings {
   };
   security: {
     twoFactor: boolean;
-    sessionTimeout: number; // minutes
+    sessionTimeout: number;
   };
   loginScreen: {
     title: string;
@@ -82,14 +82,14 @@ export interface Subtask {
 
 export interface Notification {
   id: string;
-  userId: string; // Recipient ID
+  userId: string;
   title: string;
   message: string;
   type: 'success' | 'error' | 'info' | 'warning';
   read: boolean;
   timestamp: number;
-  resourceId?: string; // ID of the task or document
-  resourceType?: 'task' | 'document'; // Type of resource to open
+  resourceId?: string;
+  resourceType?: 'task' | 'document';
 }
 
 export interface Attachment {
@@ -101,14 +101,14 @@ export interface Attachment {
   category: 'reference' | 'deliverable';
   uploadedBy: string;
   status: 'pending' | 'approved' | 'rejected';
-  feedback?: string; // Reason for rejection or video timestamp notes
+  feedback?: string;
 }
 
 export interface Task {
   id: string;
   title: string;
   description: string;
-  stage: string; // Changed from Enum to string to support dynamic stages
+  stage: string;
   priority: TaskPriority;
   assigneeId: string;
   dueDate: number;
@@ -117,9 +117,9 @@ export interface Task {
   subtasks: Subtask[];
   attachments: Attachment[];
   comments: Comment[];
-  timeSpent: number; // in minutes
+  timeSpent: number;
   accepted: boolean;
-  finalLink?: string; // Link for high-res final project download
+  finalLink?: string;
 }
 
 export interface CalendarEvent {
@@ -134,7 +134,7 @@ export interface CalendarEvent {
   platform?: 'Google Meet' | 'Zoom' | 'Teams';
   meetingLink?: string;
   taskId?: string;
-  attendeeIds?: string[]; // IDs of users mentioned in the event
+  attendeeIds?: string[];
 }
 
 export interface DashboardMetrics {
@@ -142,13 +142,13 @@ export interface DashboardMetrics {
   pendingTasks: number;
   approvalRate: number;
   completedThisMonth: number;
-  avgProductionTime: number; // in minutes
+  avgProductionTime: number;
 }
 
 export interface Document {
   id: string;
   title: string;
-  content: string; // HTML Content
+  content: string;
   type: 'meeting' | 'project' | 'briefing' | 'general';
   tags: string[];
   createdAt: number;
@@ -157,13 +157,13 @@ export interface Document {
   coverImage?: string;
   emoji?: string;
   linkedTaskId?: string;
-  sharedWith?: string[]; // Array of User IDs allowed to view/edit
+  sharedWith?: string[];
 }
 
 export interface MindMapNode {
   id: string;
   type: 'node' | 'root' | 'note' | 'text' | 'shape' | 'sticker' | 'comment';
-  label: string; // Text content or emoji char
+  label: string;
   x: number;
   y: number;
   parentId: string | null;
@@ -171,7 +171,7 @@ export interface MindMapNode {
   image?: string;
   width?: number;
   height?: number;
-  shapeType?: 'rectangle' | 'circle' | 'diamond' | 'triangle'; // For type: 'shape'
+  shapeType?: 'rectangle' | 'circle' | 'diamond' | 'triangle';
 }
 
 export interface MindMapDocument {
@@ -181,5 +181,5 @@ export interface MindMapDocument {
   updatedAt: number;
   authorId: string;
   nodes: MindMapNode[];
-  thumbnailColor: string; // For the card UI
+  thumbnailColor: string;
 }

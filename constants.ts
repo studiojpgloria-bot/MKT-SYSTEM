@@ -19,6 +19,7 @@ export const INITIAL_TASKS: Task[] = [];
 export const INITIAL_EVENTS: CalendarEvent[] = [];
 
 export const INITIAL_SETTINGS: SystemSettings = {
+    id: 'global-config', // ID estável para persistência única no Supabase
     companyName: 'Nexus Marketing',
     companyLogo: '',
     themeColor: 'indigo',

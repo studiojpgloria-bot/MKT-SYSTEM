@@ -89,21 +89,51 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteWorkflowStage = (id: string) => {
     if (localWorkflow.length <= 1) return alert("O sistema precisa de pelo menos uma etapa.");
-    if (confirm("Deseja excluir esta etapa? Isso pode afetar tarefas vinculadas.")) {
-      setLocalWorkflow(prev => prev.filter(s => s.id !== id));
+    
+    // Verificação de segurança: não deixar excluir se for usada em regras críticas de automação
+    const isUsedInAutomation = Object.values(localSettings.workflowRules).includes(id);
+    if (isUsedInAutomation) {
+      return alert("Esta etapa está sendo usada em uma Regra de Automação e não pode ser excluída.");
     }
+
+    setLocalWorkflow(prev => prev.filter(s => s.id !== id));
   };
 
   const handleAddWorkflowStage = () => {
-    const name = prompt("Nome da nova etapa:");
-    if (name) {
-      const newStage: WorkflowStage = {
-        id: `stage-${Date.now()}`,
-        name,
-        color: 'gray'
+    const newStage: WorkflowStage = {
+      id: `stage-${Date.now()}`,
+      name: 'Nova Etapa',
+      color: 'gray'
+    };
+    setLocalWorkflow(prev => [...prev, newStage]);
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const size = 1000;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // Center crop logic to maintain 1:1 ratio
+          const minDim = Math.min(img.width, img.height);
+          const sx = (img.width - minDim) / 2;
+          const sy = (img.height - minDim) / 2;
+          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
+          const dataUrl = canvas.toDataURL('image/png');
+          setLocalSettings(prev => ({ ...prev, companyLogo: dataUrl }));
+        }
       };
-      setLocalWorkflow([...localWorkflow, newStage]);
-    }
+    };
+    reader.readAsDataURL(file);
   };
 
   const TabButton = ({ id, label, icon: Icon }: any) => (
@@ -172,10 +202,10 @@ export const Settings: React.FC<SettingsProps> = ({
                     <label className="block text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3">Logotipo</label>
                     <div className="flex gap-6 items-center">
                         <div className="w-24 h-24 rounded-2xl bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] flex items-center justify-center overflow-hidden shadow-inner">
-                            {localSettings.companyLogo ? <img src={localSettings.companyLogo} className="w-full h-full object-contain p-3" /> : <ShieldCheck size={40} className="text-indigo-600/20" />}
+                            {localSettings.companyLogo ? <img src={localSettings.companyLogo} className="w-full h-full object-contain p-3" alt="Company Logo" /> : <ShieldCheck size={40} className="text-indigo-600/20" />}
                         </div>
                         <button onClick={() => logoInputRef.current?.click()} className={`py-4 px-8 ${activeTheme.bg} text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg ${activeTheme.shadow} transition-all hover:scale-105 active:scale-95`}>Fazer Upload</button>
-                        <input type="file" ref={logoInputRef} className="hidden" accept="image/*" />
+                        <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
                     </div>
                   </div>
                 </div>
@@ -232,7 +262,7 @@ export const Settings: React.FC<SettingsProps> = ({
                                         </select>
                                     </div>
                                 </div>
-                                <button onClick={() => handleRemoveUser(u.id)} className="p-3 text-slate-400 dark:text-gray-600 opacity-0 group-hover:opacity-100 hover:text-red-500 transition-all absolute top-2 right-2"><Trash2 size={16} /></button>
+                                <button onClick={() => handleRemoveUser(u.id)} className="p-3 text-slate-400 dark:text-gray-600 opacity-100 hover:text-red-500 transition-all absolute top-2 right-2"><Trash2 size={16} /></button>
                             </div>
                         ))}
                     </div>
@@ -259,13 +289,19 @@ export const Settings: React.FC<SettingsProps> = ({
                     <div className="space-y-3 max-w-2xl">
                        {localWorkflow.map((stage) => (
                            <div key={stage.id} className="flex items-center gap-4 p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-[24px] group hover:border-indigo-500/30 transition-all shadow-sm">
-                               <GripVertical size={18} className="text-slate-400 dark:text-gray-600" />
+                               <GripVertical size={18} className="text-slate-400 dark:text-gray-600 shrink-0" />
                                <input 
                                   value={stage.name} 
                                   onChange={(e) => handleUpdateWorkflowStage(stage.id, e.target.value)}
-                                  className="flex-1 font-black text-slate-700 dark:text-white text-sm bg-transparent border-none focus:ring-0"
+                                  className="flex-1 font-black text-slate-700 dark:text-white text-sm bg-transparent border-none focus:ring-0 outline-none"
                                />
-                               <button onClick={() => handleDeleteWorkflowStage(stage.id)} className="text-slate-400 dark:text-gray-600 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
+                               <button 
+                                  onClick={() => handleDeleteWorkflowStage(stage.id)} 
+                                  className="text-slate-400 hover:text-red-500 transition-colors p-2"
+                                  title="Excluir Etapa"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
                            </div>
                        ))}
                        <button onClick={handleAddWorkflowStage} className={`w-full p-6 border-2 border-dashed border-slate-300 dark:border-[#2a303c] rounded-[24px] text-slate-500 dark:text-gray-400 font-black text-xs uppercase tracking-widest hover:${activeTheme.text} hover:${activeTheme.border} transition-all bg-slate-50/50 dark:bg-white/5`}>

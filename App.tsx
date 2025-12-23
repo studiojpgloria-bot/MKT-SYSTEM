@@ -70,7 +70,6 @@ export const App: React.FC = () => {
   }, [currentUser, currentView]);
 
   useEffect(() => {
-    // Aplica ou remove a classe 'dark' com base nas configurações
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -110,6 +109,13 @@ export const App: React.FC = () => {
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Priorizar dados do banco, se não houver, manter os iniciais
+      const { data: settingsData } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
+      if (settingsData) setSettings(prev => ({ ...prev, ...settingsData }));
+
+      const { data: flowData } = await supabase.from('workflow_stages').select('*');
+      if (flowData && flowData.length > 0) setWorkflow(flowData);
+
       const { data: userData } = await supabase.from('users_profiles').select('*');
       if (userData && userData.length > 0) setUsers(userData.map(u => ({ ...u, lastSeen: Date.now() })));
       else setUsers(MOCK_USERS);
@@ -122,12 +128,6 @@ export const App: React.FC = () => {
 
       const { data: eventData } = await supabase.from('calendar_events').select('*');
       if (eventData) setEvents(eventData);
-
-      const { data: settingsData } = await supabase.from('system_settings').select('*').maybeSingle();
-      if (settingsData) setSettings({ ...INITIAL_SETTINGS, ...settingsData });
-
-      const { data: flowData } = await supabase.from('workflow_stages').select('*');
-      if (flowData && flowData.length > 0) setWorkflow(flowData);
 
       if (currentUser) {
         const { data: notifData } = await supabase.from('notifications').select('*').eq('userId', currentUser.id).order('timestamp', { ascending: false }).limit(20);
@@ -142,13 +142,23 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     fetchAllData();
+    
+    // Canais de Real-time para sincronização contínua
     const mainChannel = supabase.channel('db-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
         if (payload.eventType === 'INSERT') setTasks(prev => [...prev, payload.new as Task]);
         else if (payload.eventType === 'UPDATE') setTasks(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t));
         else if (payload.eventType === 'DELETE') setTasks(prev => prev.filter(t => t.id !== payload.old.id));
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'system_settings' }, (payload) => {
+          if (payload.new.id === 'global-config') setSettings(prev => ({ ...prev, ...payload.new }));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_stages' }, () => {
+          // Recarregar workflow em caso de mudança estrutural
+          supabase.from('workflow_stages').select('*').then(({ data }) => { if (data) setWorkflow(data); });
+      })
       .subscribe();
+      
     return () => { supabase.removeChannel(mainChannel); };
   }, [currentUser, fetchAllData]);
 
@@ -227,7 +237,18 @@ export const App: React.FC = () => {
             }
         }} />}
 
-        {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { setSettings(s); await supabase.from('system_settings').upsert([s]); }} onUpdateUsers={(nu) => setUsers(nu)} onUpdateWorkflow={(nw) => setWorkflow(nw)} onResetApp={() => {}} />}
+        {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { setSettings(s); await supabase.from('system_settings').upsert([{ ...s, id: 'global-config' }]); }} onUpdateUsers={(nu) => setUsers(nu)} onUpdateWorkflow={async (nw) => {
+            setWorkflow(nw);
+            try {
+              // Sincronização atômica do workflow
+              await supabase.from('workflow_stages').delete().not('id', 'is', null);
+              if (nw.length > 0) {
+                await supabase.from('workflow_stages').insert(nw);
+              }
+            } catch (err) {
+              console.error("Erro ao salvar workflow:", err);
+            }
+        }} onResetApp={() => {}} />}
         
         {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { setDocuments(p => p.filter(d => d.id !== id)); await supabase.from('documents').delete().eq('id', id); }} themeColor={settings.themeColor} />}
         
