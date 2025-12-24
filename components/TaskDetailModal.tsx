@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, MessageSquare, Send, CheckCircle, Clock, Upload, Timer, Plus, CheckSquare, ChevronDown, Paperclip, User as UserIcon, Image as ImageIcon, Film, ExternalLink, Link2, Pause, Play, Target, Tag, AlertCircle, Trash2 } from 'lucide-react';
+import { X, Calendar, MessageSquare, Send, CheckCircle, Clock, Upload, Timer, Plus, CheckSquare, ChevronDown, Paperclip, User as UserIcon, Image as ImageIcon, Film, ExternalLink, Link2, Pause, Play, Target, Tag, AlertCircle, Trash2, Briefcase, Hash } from 'lucide-react';
 import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask, SystemSettings, Attachment } from '../types';
 
 interface TaskDetailModalProps {
@@ -42,7 +42,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [uploadCategory, setUploadCategory] = useState<'deliverable' | 'reference'>('deliverable');
   const [tempFinalLink, setTempFinalLink] = useState('');
   
-  // Video Review State
   const [reviewingVideo, setReviewingVideo] = useState<Attachment | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -152,7 +151,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
-  // Video Review Helpers
   const formatTime = (seconds: number) => {
     if (isNaN(seconds)) return "00:00";
     const mins = Math.floor(seconds / 60);
@@ -181,38 +179,44 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const currentStage = workflow.find(s => s.id === editedTask.stage);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-black/90 backdrop-blur-md p-4 overflow-y-auto transition-all">
-      <div className="bg-white dark:bg-[#0b0e11] rounded-[40px] shadow-2xl w-full max-w-7xl h-[92vh] flex flex-col overflow-hidden border border-slate-200 dark:border-[#2a303c] relative transition-colors duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 dark:bg-black/90 backdrop-blur-md p-4 overflow-y-auto transition-all">
+      <div className="bg-white dark:bg-[#0b0e11] rounded-[40px] shadow-2xl w-full max-w-7xl min-h-[92vh] flex flex-col overflow-hidden border border-slate-200 dark:border-[#2a303c] relative transition-colors duration-300">
         
         {/* HEADER */}
         <div className="flex items-start justify-between px-10 pt-10 pb-6 shrink-0 border-b border-slate-100 dark:border-[#1e232d]">
           <div className="flex-1 space-y-4">
             <div className="flex items-center gap-4">
                <div className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
-                  {isDraft ? 'NOVO PROJETO' : (currentStage?.name || 'PROCESSO')}
+                  {isDraft ? 'DRAFT: NOVA TAREFA' : (currentStage?.name || 'PROCESSO')}
                </div>
                <div className="text-xs font-bold text-gray-400 flex items-center gap-2">
-                 <Clock size={14} className="opacity-50" /> ID: <span className="text-slate-700 dark:text-gray-300">#{isDraft ? 'DRAFT' : editedTask.id.slice(-4)}</span>
+                 <Clock size={14} className="opacity-50" /> ID: <span className="text-slate-700 dark:text-gray-300">#{isDraft ? 'TEMPORÁRIO' : editedTask.id.slice(-4)}</span>
                </div>
             </div>
-            <div className="space-y-1">
-              <input 
-                type="text" 
-                value={editedTask.client}
-                onChange={(e) => handleSaveField('client', e.target.value)}
-                placeholder="Nome do Cliente"
-                className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-transparent border-none focus:ring-0 w-full p-0 uppercase tracking-widest placeholder:opacity-30"
-              />
-              <input 
-                type="text" 
-                value={editedTask.title} 
-                onChange={(e) => handleSaveField('title', e.target.value)}
-                className="text-5xl font-black text-slate-900 dark:text-white bg-transparent border-none focus:ring-0 w-full p-0 tracking-tighter placeholder-slate-200 dark:placeholder-gray-800" 
-                placeholder="Título da Tarefa"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 dark:text-gray-600 uppercase tracking-widest block px-1">Cliente</label>
+                  <input 
+                    type="text" 
+                    value={editedTask.client}
+                    onChange={(e) => handleSaveField('client', e.target.value)}
+                    placeholder="Nome da Empresa/Cliente"
+                    className="w-full bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-xs font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                  />
+               </div>
+               <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 dark:text-gray-600 uppercase tracking-widest block px-1">Título do Projeto</label>
+                  <input 
+                    type="text" 
+                    value={editedTask.title} 
+                    onChange={(e) => handleSaveField('title', e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-black text-slate-900 dark:text-white focus:ring-1 focus:ring-indigo-500 outline-none transition-all" 
+                    placeholder="Ex: Campanha de Lançamento"
+                  />
+               </div>
             </div>
           </div>
-          <button onClick={onClose} className="p-3 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors bg-slate-50 dark:bg-[#151a21] rounded-2xl border border-slate-200 dark:border-[#2a303c]">
+          <button onClick={onClose} className="p-3 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors bg-slate-50 dark:bg-[#151a21] rounded-2xl border border-slate-200 dark:border-[#2a303c] ml-10">
             <X size={28} />
           </button>
         </div>
@@ -221,47 +225,44 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           {/* ÁREA PRINCIPAL */}
           <div className="flex-1 p-10 pt-6 overflow-y-auto custom-scrollbar space-y-10">
             
-            {showAcceptPrompt && (
-                <div className="bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/10 dark:border-indigo-500/20 rounded-[32px] p-8 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in zoom-in duration-300 h-[300px]">
-                    <div className="w-16 h-16 rounded-full bg-indigo-600/10 dark:bg-indigo-600/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                      <Timer size={40} className="animate-pulse" />
-                    </div>
-                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">Você é o responsável por esta entrega</h3>
-                    <button onClick={() => onAccept(editedTask.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-2xl font-black shadow-xl shadow-indigo-600/20 text-xs uppercase tracking-widest transition-all">ACEITAR AGORA</button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <Briefcase size={16} /> Tipo de Entrega
+                  </label>
+                  <select 
+                    value={editedTask.projectType || 'social-media'} 
+                    onChange={(e) => handleSaveField('projectType', e.target.value)}
+                    className="w-full p-4 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-700 dark:text-white outline-none appearance-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                  >
+                    <option value="social-media">Social Media (Post/Story)</option>
+                    <option value="video">Edição de Vídeo</option>
+                    <option value="design">Design Gráfico / Identidade</option>
+                    <option value="ads">Tráfego Pago / Anúncios</option>
+                    <option value="strategy">Estratégia / Briefing</option>
+                  </select>
                 </div>
-            )}
-
-            {isApproved && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-indigo-600/5 dark:bg-indigo-500/10 border border-indigo-500/10 dark:border-indigo-500/20 rounded-[32px] p-8 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
-                        <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
-                            <div className="flex-1 space-y-2">
-                                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Entrega Final Aprovada</h3>
-                                <p className="text-sm text-slate-500 dark:text-gray-400">Este projeto foi aprovado. Insira o link do arquivo final em alta qualidade.</p>
-                            </div>
-                            {isAdminOrManager ? (
-                                <div className="flex gap-2 w-full md:w-auto">
-                                    <input type="text" value={tempFinalLink} onChange={(e) => setTempFinalLink(e.target.value)} placeholder="https://drive.google.com/..." className="p-4 bg-white dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-xs text-slate-900 dark:text-white min-w-[320px] focus:ring-1 focus:ring-indigo-500" />
-                                    <button onClick={() => handleSaveField('finalLink', tempFinalLink)} className="p-4 bg-indigo-600 text-white rounded-2xl transition-all hover:bg-indigo-700"><CheckCircle size={20}/></button>
-                                </div>
-                            ) : editedTask.finalLink && (
-                                <a href={editedTask.finalLink} target="_blank" rel="noreferrer" className="px-10 py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl flex items-center gap-3 transition-all hover:scale-105">
-                                    <ExternalLink size={20} /> BAIXAR PROJETO
-                                </a>
-                            )}
-                        </div>
-                    </div>
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                    <Hash size={16} /> Horas Estimadas
+                  </label>
+                  <input 
+                    type="number" 
+                    value={editedTask.estimatedHours || 0}
+                    onChange={(e) => handleSaveField('estimatedHours', parseInt(e.target.value))}
+                    className="w-full p-4 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-700 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500 transition-all"
+                    placeholder="0"
+                  />
                 </div>
-            )}
+            </div>
 
             <div className="space-y-4">
-              <label className="text-sm font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest flex items-center gap-2"><Plus size={16} /> Descrição do Briefing</label>
+              <label className="text-sm font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest flex items-center gap-2">Descrição Detalhada / Briefing</label>
               <textarea 
                 value={editedTask.description}
                 onChange={(e) => handleSaveField('description', e.target.value)}
-                className="w-full p-6 rounded-[32px] border border-slate-200 dark:border-[#2a303c] bg-slate-50/50 dark:bg-[#151a21]/30 text-slate-700 dark:text-gray-300 focus:ring-1 focus:ring-indigo-500 resize-none h-48 placeholder-slate-300 dark:placeholder-gray-800 transition-colors text-lg"
-                placeholder="Detalhe os requisitos e objetivos deste projeto..."
+                className="w-full p-6 rounded-[32px] border border-slate-200 dark:border-[#2a303c] bg-slate-50/50 dark:bg-[#151a21]/30 text-slate-700 dark:text-gray-300 focus:ring-1 focus:ring-indigo-500 resize-none h-48 placeholder-slate-300 dark:placeholder-gray-800 transition-colors text-lg leading-relaxed"
+                placeholder="Detalhe os requisitos técnicos, referências visuais e objetivos deste projeto..."
               />
             </div>
             
@@ -278,8 +279,8 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         </div>
                     ))}
                     <div className="relative">
-                      <input type="text" value={newSubtask} onChange={(e) => setNewSubtask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()} placeholder="Adicionar nova atividade..." className="w-full bg-transparent border-dashed border-2 border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-bold text-slate-500 focus:border-indigo-500 transition-all outline-none" />
-                      <button onClick={handleAddSubtask} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-xl shadow-lg"><Plus size={16}/></button>
+                      <input type="text" value={newSubtask} onChange={(e) => setNewSubtask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()} placeholder="Adicionar nova atividade ao checklist..." className="w-full bg-transparent border-dashed border-2 border-slate-200 dark:border-[#2a303c] rounded-2xl p-5 text-sm font-bold text-slate-500 focus:border-indigo-500 transition-all outline-none" />
+                      <button onClick={handleAddSubtask} className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-indigo-600 text-white rounded-xl shadow-lg"><Plus size={20}/></button>
                     </div>
                 </div>
             </div>
@@ -288,17 +289,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 <div className="flex items-center justify-between">
                     <label className="text-sm font-black text-slate-500 dark:text-gray-400 flex items-center gap-3 uppercase tracking-widest">Anexos & Revisão</label>
                     <div className="flex gap-2">
-                        <button onClick={() => { setUploadCategory('reference'); fileInputRef.current?.click(); }} className="px-4 py-2 bg-slate-100 dark:bg-[#1e232d] text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-[#2a303c] transition-all hover:bg-slate-200">Referência</button>
-                        <button onClick={() => { setUploadCategory('deliverable'); fileInputRef.current?.click(); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all hover:bg-indigo-700">+ Entregável</button>
+                        <button onClick={() => { setUploadCategory('reference'); fileInputRef.current?.click(); }} className="px-5 py-2.5 bg-slate-100 dark:bg-[#1e232d] text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-[#2a303c] transition-all hover:bg-slate-200">Adicionar Referência</button>
+                        <button onClick={() => { setUploadCategory('deliverable'); fileInputRef.current?.click(); }} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all hover:bg-indigo-700">+ Enviar Entregável</button>
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {editedTask.attachments?.map(att => (
-                        <div 
-                          key={att.id} 
-                          onClick={() => att.type === 'video' && setReviewingVideo(att)}
-                          className={`bg-slate-50/50 dark:bg-[#151a21]/40 border border-slate-200 dark:border-[#2a303c] p-4 rounded-3xl flex flex-col gap-3 group transition-all relative ${att.type === 'video' ? 'cursor-pointer hover:border-indigo-500' : ''}`}
-                        >
+                        <div key={att.id} onClick={() => att.type === 'video' && setReviewingVideo(att)} className={`bg-slate-50/50 dark:bg-[#151a21]/40 border border-slate-200 dark:border-[#2a303c] p-4 rounded-3xl flex flex-col gap-3 group transition-all relative ${att.type === 'video' ? 'cursor-pointer hover:border-indigo-500' : ''}`}>
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-600">
                                     {att.type === 'image' ? <ImageIcon size={24}/> : att.type === 'video' ? <Film size={24}/> : <Paperclip size={24}/>}
@@ -309,12 +306,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 </div>
                                 <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${att.status === 'approved' ? 'bg-green-500/10 text-green-500' : att.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'}`}>{att.status.toUpperCase()}</span>
                             </div>
-                            {att.status === 'rejected' && att.feedback && (
-                                <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-[11px] text-red-600 dark:text-red-400 font-bold leading-relaxed">
-                                    <AlertCircle size={12} className="inline mr-1" /> {att.feedback}
-                                </div>
-                            )}
-                            <button onClick={(e) => { e.stopPropagation(); handleSaveField('attachments', editedTask.attachments.filter(a => a.id !== att.id)); }} className="absolute -top-2 -right-2 w-6 h-6 bg-white dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md"><X size={12}/></button>
+                            <button onClick={(e) => { e.stopPropagation(); handleSaveField('attachments', editedTask.attachments.filter(a => a.id !== att.id)); }} className="absolute -top-2 -right-2 w-7 h-7 bg-white dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md hover:scale-110"><Trash2 size={14}/></button>
                         </div>
                     ))}
                     <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
@@ -331,7 +323,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                 <img src={commenter?.avatar} className="w-10 h-10 rounded-full border border-slate-200 dark:border-[#2a303c] bg-white dark:bg-[#151a21]" />
                                 <div className="flex-1 bg-slate-50/50 dark:bg-[#151a21]/50 p-5 rounded-3xl border border-slate-200 dark:border-[#2a303c]">
                                     <p className="text-xs font-black text-indigo-600 dark:text-indigo-400 mb-1">{commenter?.name}</p>
-                                    <p className="text-sm text-slate-700 dark:text-gray-300">{c.text}</p>
+                                    <p className="text-sm text-slate-700 dark:text-gray-300 leading-relaxed">{c.text}</p>
                                 </div>
                             </div>
                         );
@@ -340,15 +332,16 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 <div className="flex gap-4 items-start">
                     <img src={currentUser.avatar} className="w-10 h-10 rounded-full border border-slate-200 dark:border-[#2a303c]" />
                     <div className="flex-1 relative">
-                        <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Escreva sua opinião aqui..." className="w-full p-5 pr-14 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-3xl text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-indigo-500 outline-none resize-none transition-colors" rows={2} />
-                        <button onClick={handleCommentSubmit} className="absolute right-3 bottom-3 p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 shadow-lg transition-all"><Send size={18} /></button>
+                        <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Escreva sua observação técnica ou feedback..." className="w-full p-5 pr-14 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-3xl text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-indigo-500 outline-none resize-none transition-colors" rows={3} />
+                        <button onClick={handleCommentSubmit} className="absolute right-3 bottom-3 p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 shadow-lg transition-all active:scale-95"><Send size={20} /></button>
                     </div>
                 </div>
             </div>
           </div>
 
           {/* SIDEBAR */}
-          <div className="w-full md:w-[400px] p-10 space-y-10 bg-slate-50 dark:bg-[#0b0e11] border-l border-slate-200 dark:border-[#2a303c] transition-colors duration-300 overflow-y-auto custom-scrollbar">
+          <div className="w-full md:w-[420px] p-10 space-y-8 bg-slate-50 dark:bg-[#0b0e11] border-l border-slate-200 dark:border-[#2a303c] transition-colors duration-300 overflow-y-auto custom-scrollbar">
+             
              <div className="space-y-4">
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cronômetro de Produção</label>
                 <div className={`p-8 rounded-[32px] border transition-all ${!isDraft ? 'bg-white dark:bg-[#151a21] border-indigo-500/30 shadow-sm' : 'bg-slate-200/20 dark:bg-white/5 border-slate-200 dark:border-[#2a303c]'}`}>
@@ -365,10 +358,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
              </div>
 
              <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Prioridade</label>
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Etapa do Workflow</label>
                 <div className="relative">
-                    <select value={editedTask.priority} onChange={(e) => handleSaveField('priority', e.target.value as TaskPriority)} className="w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none appearance-none focus:ring-1 focus:ring-indigo-500">
-                        {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
+                    <select value={editedTask.stage} onChange={(e) => handleSaveField('stage', e.target.value)} className="w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-black text-slate-900 dark:text-white outline-none appearance-none focus:ring-1 focus:ring-indigo-500">
+                        {workflow.map(s => <option key={s.id} value={s.id}>{s.name.toUpperCase()}</option>)}
+                    </select>
+                    <ChevronDown size={18} className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+             </div>
+
+             <div className="space-y-4">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Prioridade do Job</label>
+                <div className="relative">
+                    <select value={editedTask.priority} onChange={(e) => handleSaveField('priority', e.target.value as TaskPriority)} className="w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-black text-slate-900 dark:text-white outline-none appearance-none focus:ring-1 focus:ring-indigo-500">
+                        {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p.toUpperCase()}</option>)}
                     </select>
                     <ChevronDown size={18} className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                 </div>
@@ -385,7 +388,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
              </div>
 
              <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Prazo Final</label>
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Data Limite de Entrega</label>
                 <div className="relative">
                     <Calendar size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input type="datetime-local" value={new Date(editedTask.dueDate).toISOString().slice(0, 16)} onChange={(e) => handleSaveField('dueDate', new Date(e.target.value).getTime())} className="w-full p-5 pl-14 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500" />
@@ -393,42 +396,43 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
              </div>
 
              <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Tags de Projeto</label>
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Tags de Identificação</label>
                 <div className="flex flex-wrap gap-2">
                     {editedTask.tags.map(t => (
-                        <span key={t} className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1">
+                        <span key={t} className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1 border border-indigo-500/20 shadow-sm">
                             {t} <button onClick={() => handleSaveField('tags', editedTask.tags.filter(tag => tag !== t))}><X size={12}/></button>
                         </span>
                     ))}
                 </div>
                 <div className="relative">
                   <Tag size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input type="text" value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTag()} placeholder="Adicionar tag..." className="w-full p-4 pl-12 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-xs font-bold outline-none" />
+                  <input type="text" value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTag()} placeholder="Ex: Criativo, Urgente..." className="w-full p-4 pl-12 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-xs font-bold outline-none focus:ring-1 focus:ring-indigo-500" />
                 </div>
              </div>
 
-             <div className="mt-auto pt-10 flex gap-4">
-                 <button onClick={onClose} className="flex-1 py-5 text-xs font-black text-slate-400 dark:text-gray-600 border border-slate-200 dark:border-[#2a303c] rounded-2xl hover:bg-slate-100 dark:hover:bg-white/5 uppercase tracking-widest transition-all">Sair</button>
+             <div className="mt-auto pt-10 flex flex-col gap-3">
+                 <button onClick={onClose} className="w-full py-5 text-xs font-black text-slate-400 dark:text-gray-600 border border-slate-200 dark:border-[#2a303c] rounded-2xl hover:bg-slate-100 dark:hover:bg-white/5 uppercase tracking-widest transition-all">Sair sem salvar</button>
                  {isDraft && onCreate && (
-                   <button onClick={() => onCreate(editedTask)} className="flex-[2] py-5 text-xs font-black text-white bg-[#22c55e] rounded-2xl shadow-lg shadow-green-500/20 uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Criar Projeto</button>
+                   <button onClick={() => onCreate(editedTask)} className="w-full py-6 text-xs font-black text-white bg-green-600 rounded-3xl shadow-xl shadow-green-500/20 uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all">FINALIZAR E CRIAR JOB</button>
                  )}
                  {!isDraft && (
-                    <button onClick={onClose} className="flex-[2] py-5 text-xs font-black text-white bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/20 uppercase tracking-widest transition-all">Confirmar Ajustes</button>
+                    <button onClick={onClose} className="w-full py-6 text-xs font-black text-white bg-indigo-600 rounded-3xl shadow-xl shadow-indigo-500/20 uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95">CONFIRMAR ALTERAÇÕES</button>
+                 )}
+                 {!isDraft && isAdminOrManager && (
+                    <button onClick={() => { if(confirm('Tem certeza que deseja excluir esta tarefa permanentemente?')) onDelete(editedTask.id) }} className="w-full py-4 text-[10px] font-black text-red-500 hover:bg-red-500/10 rounded-2xl transition-all uppercase tracking-widest">Excluir Job</button>
                  )}
              </div>
           </div>
         </div>
       </div>
 
-      {/* VIDEO REVIEW MODAL (RESTAURADO) */}
+      {/* VIDEO REVIEW MODAL */}
       {reviewingVideo && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6 overflow-hidden animate-in fade-in duration-300">
           <div className="bg-white dark:bg-[#0b0e11] w-full max-w-[95vw] h-[90vh] rounded-[40px] border border-slate-200 dark:border-[#2a303c] flex flex-col md:flex-row overflow-hidden shadow-2xl">
-            {/* Player Area */}
             <div className="flex-1 bg-black flex items-center justify-center relative border-r border-slate-200 dark:border-[#2a303c]">
               <button onClick={() => setReviewingVideo(null)} className="absolute top-8 right-8 z-50 p-3 bg-white/5 text-white rounded-2xl hover:bg-white/10 transition-colors border border-white/10"><X size={24} /></button>
               <video ref={videoRef} src={reviewingVideo.url} className="w-full h-full object-contain" onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)} onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)} />
-              {/* Controls Overlay */}
               <div className="absolute bottom-0 left-0 right-0 p-10 bg-gradient-to-t from-black/80 to-transparent">
                 <div className="flex flex-col gap-6">
                   <div className="relative h-2 bg-white/10 rounded-full cursor-pointer overflow-visible">
@@ -450,7 +454,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
               </div>
             </div>
-            {/* Marking List Area */}
             <div className="w-full md:w-[450px] p-10 bg-white dark:bg-[#0b0e11] flex flex-col overflow-hidden transition-colors">
                <div className="mb-10">
                   <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Revisão Técnica</h3>

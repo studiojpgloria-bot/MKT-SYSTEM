@@ -34,7 +34,7 @@ export interface WorkflowRules {
 }
 
 export interface SystemSettings {
-  id?: string; // ID fixo para o singleton no banco
+  id?: string;
   companyName: string;
   companyLogo: string;
   themeColor: 'indigo' | 'emerald' | 'rose' | 'blue' | 'violet' | 'orange';
@@ -113,6 +113,8 @@ export interface Task {
   assigneeId: string;
   dueDate: number;
   client: string;
+  projectType: string;
+  estimatedHours: number;
   tags: string[];
   subtasks: Subtask[];
   attachments: Attachment[];

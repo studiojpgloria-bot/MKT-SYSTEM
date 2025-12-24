@@ -39,7 +39,6 @@ export const App: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [activeToast, setActiveToast] = useState<Notification | null>(null);
   
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([
     { id: 'briefing', name: 'Briefing', color: 'gray' },
@@ -56,27 +55,18 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
-  const addNotification = async (notif: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
-    const newNotif = { ...notif, id: `notif-${Date.now()}`, timestamp: Date.now(), read: false };
-    await supabase.from('notifications').insert([newNotif]);
-  };
-
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data: settingsData } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
       if (settingsData) setSettings(settingsData);
-      else await supabase.from('system_settings').upsert([{ ...INITIAL_SETTINGS, id: 'global-config' }]);
 
       const { data: flowData } = await supabase.from('workflow_stages').select('*').order('id');
       if (flowData && flowData.length > 0) setWorkflow(flowData);
 
       const { data: userData } = await supabase.from('users_profiles').select('*');
       if (userData && userData.length > 0) setUsers(userData.map(u => ({ ...u, lastSeen: Date.now() })));
-      else {
-          setUsers(MOCK_USERS);
-          await supabase.from('users_profiles').upsert(MOCK_USERS);
-      }
+      else setUsers(MOCK_USERS);
 
       const { data: taskData } = await supabase.from('tasks').select('*');
       if (taskData) setTasks(taskData);
@@ -101,14 +91,8 @@ export const App: React.FC = () => {
   useEffect(() => {
     fetchAllData();
     const mainChannel = supabase.channel('nexus-global-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
-        if (payload.eventType === 'INSERT') setTasks(prev => [...prev, payload.new as Task]);
-        else if (payload.eventType === 'UPDATE') setTasks(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t));
-        else if (payload.eventType === 'DELETE') setTasks(prev => prev.filter(t => t.id !== payload.old.id));
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'system_settings' }, (payload) => {
-          if (payload.new.id === 'global-config') setSettings(payload.new as SystemSettings);
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchAllData())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'system_settings' }, () => fetchAllData())
       .subscribe();
     return () => { supabase.removeChannel(mainChannel); };
   }, [currentUser, fetchAllData]);
@@ -147,7 +131,7 @@ export const App: React.FC = () => {
         onNavigate={setCurrentView}
         onLogout={handleLogout}
         onNewTask={() => {
-            const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage: workflow[0].id, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Projeto', tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
+            const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage: workflow[0].id, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Projeto', projectType: 'social-media', estimatedHours: 4, tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
             setSelectedTask(newTask); setIsTaskModalOpen(true);
         }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
@@ -169,7 +153,7 @@ export const App: React.FC = () => {
     >
         {currentView === 'dashboard' && <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={() => {}} onNavigate={setCurrentView} />}
         {currentView === 'crm' && <KanbanBoard tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} onUpdateTask={handleTaskUpdate} onTaskClick={(tid) => { setSelectedTask(tasks.find(t => t.id === tid)!); setIsTaskModalOpen(true); }} onDeleteTask={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); }} onExportTask={() => {}} onNewTask={(stage) => {
-            const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Projeto', tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
+            const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Projeto', projectType: 'social-media', estimatedHours: 4, tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
             setSelectedTask(newTask); setIsTaskModalOpen(true);
         }} />}
         {currentView === 'calendar' && <CalendarView events={events} users={users} onAddEvent={async (e) => { setEvents(p => [...p, e]); await supabase.from('calendar_events').insert([e]); }} onUpdateEvent={async (id, updates) => { setEvents(p => p.map(ev => ev.id === id ? { ...ev, ...updates } : ev)); await supabase.from('calendar_events').update(updates).eq('id', id); }} onDeleteEvent={async (id) => { setEvents(p => p.filter(ev => ev.id !== id)); await supabase.from('calendar_events').delete().eq('id', id); }} onViewTask={() => {}} themeColor={settings.themeColor} settings={settings} />}
