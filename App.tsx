@@ -19,6 +19,7 @@ import { DocumentsView } from './components/DocumentsView';
 import { TaskDetailModal } from './components/TaskDetailModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { DocumentEditorModal } from './components/DocumentEditorModal';
+import { NotificationToast } from './components/NotificationToast';
 import { supabase } from './supabase';
 
 export const App: React.FC = () => {
@@ -37,6 +38,7 @@ export const App: React.FC = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [activeToast, setActiveToast] = useState<Notification | null>(null);
   
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([
     { id: 'briefing', name: 'Briefing', color: 'gray' },
@@ -88,9 +90,7 @@ export const App: React.FC = () => {
       timestamp: Date.now(),
       read: false
     };
-    if (currentUser && newNotif.userId === currentUser.id) {
-        setNotifications(prev => [newNotif as Notification, ...prev]);
-    }
+    // Persistência no banco para todos os usuários
     await supabase.from('notifications').insert([newNotif]);
   };
 
@@ -109,7 +109,6 @@ export const App: React.FC = () => {
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Priorizar dados do banco, se não houver, manter os iniciais
       const { data: settingsData } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
       if (settingsData) setSettings(prev => ({ ...prev, ...settingsData }));
 
@@ -143,18 +142,40 @@ export const App: React.FC = () => {
   useEffect(() => {
     fetchAllData();
     
-    // Canais de Real-time para sincronização contínua
-    const mainChannel = supabase.channel('db-changes')
+    const mainChannel = supabase.channel('nexus-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
         if (payload.eventType === 'INSERT') setTasks(prev => [...prev, payload.new as Task]);
         else if (payload.eventType === 'UPDATE') setTasks(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t));
         else if (payload.eventType === 'DELETE') setTasks(prev => prev.filter(t => t.id !== payload.old.id));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users_profiles' }, (payload) => {
+        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+          setUsers(prev => {
+            const exists = prev.find(u => u.id === payload.new.id);
+            if (exists) return prev.map(u => u.id === payload.new.id ? { ...u, ...payload.new } : u);
+            return [...prev, payload.new as User];
+          });
+          // Se for o próprio usuário, atualiza o localStorage
+          if (currentUser && payload.new.id === currentUser.id) {
+            const updatedUser = { ...currentUser, ...payload.new };
+            setCurrentUser(updatedUser);
+            localStorage.setItem('nexus_user', JSON.stringify(updatedUser));
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setUsers(prev => prev.filter(u => u.id !== payload.old.id));
+        }
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+          const newNotif = payload.new as Notification;
+          if (currentUser && newNotif.userId === currentUser.id) {
+              setNotifications(prev => [newNotif, ...prev]);
+              setActiveToast(newNotif);
+          }
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'system_settings' }, (payload) => {
           if (payload.new.id === 'global-config') setSettings(prev => ({ ...prev, ...payload.new }));
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_stages' }, () => {
-          // Recarregar workflow em caso de mudança estrutural
           supabase.from('workflow_stages').select('*').then(({ data }) => { if (data) setWorkflow(data); });
       })
       .subscribe();
@@ -163,6 +184,20 @@ export const App: React.FC = () => {
   }, [currentUser, fetchAllData]);
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+      // Notifica o usuário se o assignee mudar
+      const oldTask = tasks.find(t => t.id === taskId);
+      if (updates.assigneeId && oldTask && updates.assigneeId !== oldTask.assigneeId) {
+          const newAssignee = users.find(u => u.id === updates.assigneeId);
+          if (newAssignee && currentUser) {
+              addNotification({
+                  userId: newAssignee.id,
+                  title: 'Nova Atribuição',
+                  message: `${currentUser.name} atribuiu a tarefa "${updates.title || oldTask.title}" a você.`,
+                  type: 'info'
+              });
+          }
+      }
+
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
       await supabase.from('tasks').update(updates).eq('id', taskId);
   };
@@ -176,6 +211,14 @@ export const App: React.FC = () => {
       handleTaskUpdate(taskId, { comments: updatedComments });
       if (task.assigneeId !== currentUser.id) {
           addNotification({ userId: task.assigneeId, title: 'Novo Comentário', message: `${currentUser.name} comentou em "${task.title}"`, type: 'info' });
+      }
+  };
+
+  const handleUpdateUsers = async (updatedUsers: User[]) => {
+      setUsers(updatedUsers);
+      // Sincroniza cada usuário modificado com o banco
+      for (const u of updatedUsers) {
+          await supabase.from('users_profiles').upsert([u]);
       }
   };
 
@@ -198,7 +241,7 @@ export const App: React.FC = () => {
         onToggleTheme={() => { 
           const updated = {...settings, darkMode: !settings.darkMode}; 
           setSettings(updated); 
-          supabase.from('system_settings').upsert([updated]); 
+          supabase.from('system_settings').upsert([{ ...updated, id: 'global-config' }]); 
         }}
         notifications={notifications}
         onNotificationClick={async (n) => {
@@ -210,6 +253,22 @@ export const App: React.FC = () => {
           await supabase.from('notifications').delete().eq('userId', currentUser.id);
         }}
     >
+        {activeToast && (
+            <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right duration-300">
+                <NotificationToast 
+                    notification={activeToast} 
+                    onClose={() => setActiveToast(null)} 
+                    onClick={(n) => { 
+                        if (n.resourceId) { 
+                            const t = tasks.find(task => task.id === n.resourceId);
+                            if (t) { setSelectedTask(t); setIsTaskModalOpen(true); }
+                        }
+                        setActiveToast(null);
+                    }} 
+                />
+            </div>
+        )}
+
         {currentView === 'dashboard' && <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={async (s) => { const updated = {...currentUser, status: s}; setCurrentUser(updated); localStorage.setItem('nexus_user', JSON.stringify(updated)); await supabase.from('users_profiles').upsert([{ id: currentUser.id, status: s }]); }} onNavigate={setCurrentView} />}
         
         {currentView === 'crm' && <KanbanBoard tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} onUpdateTask={handleTaskUpdate} onTaskClick={(tid) => { setSelectedTask(tasks.find(t => t.id === tid)!); setIsTaskModalOpen(true); }} onDeleteTask={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); }} onExportTask={() => {}} onNewTask={(stage) => {
@@ -237,10 +296,9 @@ export const App: React.FC = () => {
             }
         }} />}
 
-        {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { setSettings(s); await supabase.from('system_settings').upsert([{ ...s, id: 'global-config' }]); }} onUpdateUsers={(nu) => setUsers(nu)} onUpdateWorkflow={async (nw) => {
+        {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { setSettings(s); await supabase.from('system_settings').upsert([{ ...s, id: 'global-config' }]); }} onUpdateUsers={handleUpdateUsers} onUpdateWorkflow={async (nw) => {
             setWorkflow(nw);
             try {
-              // Sincronização atômica do workflow
               await supabase.from('workflow_stages').delete().not('id', 'is', null);
               if (nw.length > 0) {
                 await supabase.from('workflow_stages').insert(nw);

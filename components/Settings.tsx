@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Save, User as UserIcon, Building, Palette, Shield, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon, Upload, Moon, Sun, ShieldCheck, Monitor, Lock, ChevronDown, Key, UserCircle, Globe } from 'lucide-react';
 import { SystemSettings, User, UserRole, WorkflowStage, Task } from '../types';
@@ -89,13 +90,10 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const handleDeleteWorkflowStage = (id: string) => {
     if (localWorkflow.length <= 1) return alert("O sistema precisa de pelo menos uma etapa.");
-    
-    // Verificação de segurança: não deixar excluir se for usada em regras críticas de automação
     const isUsedInAutomation = Object.values(localSettings.workflowRules).includes(id);
     if (isUsedInAutomation) {
       return alert("Esta etapa está sendo usada em uma Regra de Automação e não pode ser excluída.");
     }
-
     setLocalWorkflow(prev => prev.filter(s => s.id !== id));
   };
 
@@ -123,7 +121,6 @@ export const Settings: React.FC<SettingsProps> = ({
         canvas.height = size;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          // Center crop logic to maintain 1:1 ratio
           const minDim = Math.min(img.width, img.height);
           const sx = (img.width - minDim) / 2;
           const sy = (img.height - minDim) / 2;
@@ -266,7 +263,6 @@ export const Settings: React.FC<SettingsProps> = ({
                             </div>
                         ))}
                     </div>
-                    <SaveButton onClick={() => alert("Membros sincronizados automaticamente.")} />
                 </div>
             )}
 
@@ -390,7 +386,6 @@ export const Settings: React.FC<SettingsProps> = ({
                             </div>
                         </div>
                     </div>
-                    <SaveButton onClick={() => alert("Configurações de segurança atualizadas.")} />
                 </div>
             )}
         </div>
