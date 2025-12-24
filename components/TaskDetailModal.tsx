@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, MessageSquare, Send, CheckCircle, Clock, Upload, Timer, Plus, CheckSquare, ChevronDown, Paperclip, User as UserIcon, Image as ImageIcon, Film, ExternalLink, Link2, Pause, Play, Target } from 'lucide-react';
-import { Task, User, UserRole, WorkflowStage, Subtask, SystemSettings, Attachment } from '../types';
+import { X, Calendar, MessageSquare, Send, CheckCircle, Clock, Upload, Timer, Plus, CheckSquare, ChevronDown, Paperclip, User as UserIcon, Image as ImageIcon, Film, ExternalLink, Link2, Pause, Play, Target, Tag, AlertCircle, Trash2 } from 'lucide-react';
+import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask, SystemSettings, Attachment } from '../types';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -37,10 +37,18 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [editedTask, setEditedTask] = useState<Task | null>(task);
   const [newComment, setNewComment] = useState('');
   const [newSubtask, setNewSubtask] = useState('');
+  const [newTag, setNewTag] = useState('');
   const [timeRemaining, setTimeRemaining] = useState<string>('Pendente');
   const [uploadCategory, setUploadCategory] = useState<'deliverable' | 'reference'>('deliverable');
   const [tempFinalLink, setTempFinalLink] = useState('');
   
+  // Video Review State
+  const [reviewingVideo, setReviewingVideo] = useState<Attachment | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -103,6 +111,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
+  const handleAddTag = () => {
+    if (newTag.trim() && !editedTask.tags.includes(newTag.trim())) {
+      handleSaveField('tags', [...editedTask.tags, newTag.trim()]);
+      setNewTag('');
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -137,30 +152,65 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
+  // Video Review Helpers
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const parseFeedback = (feedback: string) => {
+    const lines = feedback.split('\n');
+    return lines.map(line => {
+      const match = line.match(/^\[(\d{2}:\d{2})\]\s*(.*)/);
+      if (match) return { time: match[1], note: match[2] };
+      return { time: '00:00', note: line };
+    });
+  };
+
+  const jumpToTime = (timeStr: string) => {
+    const parts = timeStr.split(':').map(Number);
+    const seconds = parts[0] * 60 + parts[1];
+    if (videoRef.current) {
+      videoRef.current.currentTime = seconds;
+      if (!isPlaying) { videoRef.current.play(); setIsPlaying(true); }
+    }
+  };
+
   const currentStage = workflow.find(s => s.id === editedTask.stage);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-black/90 backdrop-blur-md p-4 overflow-y-auto transition-colors duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 dark:bg-black/90 backdrop-blur-md p-4 overflow-y-auto transition-all">
       <div className="bg-white dark:bg-[#0b0e11] rounded-[40px] shadow-2xl w-full max-w-7xl h-[92vh] flex flex-col overflow-hidden border border-slate-200 dark:border-[#2a303c] relative transition-colors duration-300">
         
         {/* HEADER */}
-        <div className="flex items-start justify-between px-10 pt-10 pb-6 shrink-0 bg-white dark:bg-[#0b0e11] transition-colors">
+        <div className="flex items-start justify-between px-10 pt-10 pb-6 shrink-0 border-b border-slate-100 dark:border-[#1e232d]">
           <div className="flex-1 space-y-4">
             <div className="flex items-center gap-4">
                <div className="bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">
-                  {isDraft ? 'RASCUNHO' : (currentStage?.name || 'PROCESSO')}
+                  {isDraft ? 'NOVO PROJETO' : (currentStage?.name || 'PROCESSO')}
                </div>
                <div className="text-xs font-bold text-gray-400 flex items-center gap-2">
-                 <Clock size={14} className="opacity-50" /> ID: <span className="text-slate-700 dark:text-gray-300">#{isDraft ? 'NOVO' : editedTask.id.slice(-4)}</span>
+                 <Clock size={14} className="opacity-50" /> ID: <span className="text-slate-700 dark:text-gray-300">#{isDraft ? 'DRAFT' : editedTask.id.slice(-4)}</span>
                </div>
             </div>
-            <input 
-              type="text" 
-              value={editedTask.title} 
-              onChange={(e) => handleSaveField('title', e.target.value)}
-              className="text-5xl font-black text-slate-900 dark:text-white bg-transparent border-none focus:ring-0 w-full p-0 tracking-tighter placeholder-slate-200 dark:placeholder-gray-800" 
-              placeholder="Título da Tarefa"
-            />
+            <div className="space-y-1">
+              <input 
+                type="text" 
+                value={editedTask.client}
+                onChange={(e) => handleSaveField('client', e.target.value)}
+                placeholder="Nome do Cliente"
+                className="text-xs font-black text-indigo-600 dark:text-indigo-400 bg-transparent border-none focus:ring-0 w-full p-0 uppercase tracking-widest placeholder:opacity-30"
+              />
+              <input 
+                type="text" 
+                value={editedTask.title} 
+                onChange={(e) => handleSaveField('title', e.target.value)}
+                className="text-5xl font-black text-slate-900 dark:text-white bg-transparent border-none focus:ring-0 w-full p-0 tracking-tighter placeholder-slate-200 dark:placeholder-gray-800" 
+                placeholder="Título da Tarefa"
+              />
+            </div>
           </div>
           <button onClick={onClose} className="p-3 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors bg-slate-50 dark:bg-[#151a21] rounded-2xl border border-slate-200 dark:border-[#2a303c]">
             <X size={28} />
@@ -169,15 +219,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden bg-white dark:bg-[#0b0e11] transition-colors">
           {/* ÁREA PRINCIPAL */}
-          <div className="flex-1 p-10 pt-0 overflow-y-auto custom-scrollbar space-y-10">
+          <div className="flex-1 p-10 pt-6 overflow-y-auto custom-scrollbar space-y-10">
             
             {showAcceptPrompt && (
-                <div className="bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/10 dark:border-indigo-500/20 rounded-[32px] p-8 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in zoom-in duration-300 h-[400px]">
+                <div className="bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/10 dark:border-indigo-500/20 rounded-[32px] p-8 flex flex-col items-center justify-center text-center space-y-4 animate-in fade-in zoom-in duration-300 h-[300px]">
                     <div className="w-16 h-16 rounded-full bg-indigo-600/10 dark:bg-indigo-600/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
                       <Timer size={40} className="animate-pulse" />
                     </div>
-                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">Tarefa pendente de aceite</h3>
-                    <button onClick={() => onAccept(editedTask.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-2xl font-black shadow-xl shadow-indigo-600/20 text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95">ACEITAR TAREFA AGORA</button>
+                    <h3 className="text-2xl font-black text-slate-900 dark:text-white">Você é o responsável por esta entrega</h3>
+                    <button onClick={() => onAccept(editedTask.id)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-5 rounded-2xl font-black shadow-xl shadow-indigo-600/20 text-xs uppercase tracking-widest transition-all">ACEITAR AGORA</button>
                 </div>
             )}
 
@@ -188,15 +238,15 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         <div className="flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
                             <div className="flex-1 space-y-2">
                                 <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Entrega Final Aprovada</h3>
-                                <p className="text-sm text-slate-500 dark:text-gray-400">Link do arquivo final em alta qualidade para download.</p>
+                                <p className="text-sm text-slate-500 dark:text-gray-400">Este projeto foi aprovado. Insira o link do arquivo final em alta qualidade.</p>
                             </div>
                             {isAdminOrManager ? (
                                 <div className="flex gap-2 w-full md:w-auto">
-                                    <input type="text" value={tempFinalLink} onChange={(e) => setTempFinalLink(e.target.value)} placeholder="Link do Drive..." className="p-4 bg-white dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-xs text-slate-900 dark:text-white min-w-[280px]" />
-                                    <button onClick={() => handleSaveField('finalLink', tempFinalLink)} className="p-4 bg-indigo-600 text-white rounded-2xl transition-all hover:bg-indigo-700 active:scale-95"><CheckCircle size={20}/></button>
+                                    <input type="text" value={tempFinalLink} onChange={(e) => setTempFinalLink(e.target.value)} placeholder="https://drive.google.com/..." className="p-4 bg-white dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-xs text-slate-900 dark:text-white min-w-[320px] focus:ring-1 focus:ring-indigo-500" />
+                                    <button onClick={() => handleSaveField('finalLink', tempFinalLink)} className="p-4 bg-indigo-600 text-white rounded-2xl transition-all hover:bg-indigo-700"><CheckCircle size={20}/></button>
                                 </div>
                             ) : editedTask.finalLink && (
-                                <a href={editedTask.finalLink} target="_blank" rel="noreferrer" className="px-10 py-5 bg-indigo-600 text-white font-black rounded-[24px] shadow-xl flex items-center gap-3 transition-all hover:bg-indigo-700 hover:scale-105">
+                                <a href={editedTask.finalLink} target="_blank" rel="noreferrer" className="px-10 py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl flex items-center gap-3 transition-all hover:scale-105">
                                     <ExternalLink size={20} /> BAIXAR PROJETO
                                 </a>
                             )}
@@ -206,53 +256,73 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             )}
 
             <div className="space-y-4">
-              <label className="text-sm font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest">Descrição</label>
+              <label className="text-sm font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest flex items-center gap-2"><Plus size={16} /> Descrição do Briefing</label>
               <textarea 
                 value={editedTask.description}
                 onChange={(e) => handleSaveField('description', e.target.value)}
-                className="w-full p-6 rounded-[32px] border border-slate-200 dark:border-[#2a303c] bg-slate-50/50 dark:bg-[#151a21]/30 text-slate-700 dark:text-gray-300 focus:ring-1 focus:ring-indigo-500 resize-none h-48 placeholder-slate-300 dark:placeholder-gray-800 transition-colors"
-                placeholder="Descreva os objetivos do projeto..."
+                className="w-full p-6 rounded-[32px] border border-slate-200 dark:border-[#2a303c] bg-slate-50/50 dark:bg-[#151a21]/30 text-slate-700 dark:text-gray-300 focus:ring-1 focus:ring-indigo-500 resize-none h-48 placeholder-slate-300 dark:placeholder-gray-800 transition-colors text-lg"
+                placeholder="Detalhe os requisitos e objetivos deste projeto..."
               />
             </div>
             
             <div className="space-y-4">
                 <label className="text-sm font-black text-slate-500 dark:text-gray-400 flex items-center gap-3 uppercase tracking-widest">
-                  <CheckSquare size={20} className="text-indigo-600 dark:text-indigo-500" /> Checklist
+                  <CheckSquare size={20} className="text-indigo-600 dark:text-indigo-500" /> Checklist de Atividades
                 </label>
                 <div className="space-y-3">
                     {(editedTask.subtasks || []).map(st => (
-                        <div key={st.id} className="flex items-center gap-4 bg-slate-50/50 dark:bg-[#151a21]/20 p-4 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-[#2a303c] transition-all">
+                        <div key={st.id} className="flex items-center gap-4 bg-slate-50/50 dark:bg-[#151a21]/20 p-4 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-[#2a303c] transition-all group">
                             <button onClick={() => handleSaveField('subtasks', editedTask.subtasks.map(s => s.id === st.id ? {...s, completed: !s.completed} : s))} className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all ${st.completed ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-[#2a303c] bg-transparent'}`}>{st.completed && <CheckCircle size={14} className="text-white" />}</button>
-                            <span className={`text-base font-bold ${st.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-gray-300'}`}>{st.title}</span>
+                            <span className={`text-base font-bold flex-1 ${st.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-gray-300'}`}>{st.title}</span>
+                            <button onClick={() => handleSaveField('subtasks', editedTask.subtasks.filter(s => s.id !== st.id))} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"><X size={16} /></button>
                         </div>
                     ))}
-                    <input type="text" value={newSubtask} onChange={(e) => setNewSubtask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()} placeholder="Adicionar item ao checklist..." className="w-full bg-transparent border-dashed border-2 border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-bold text-slate-500 focus:border-indigo-500 transition-all outline-none" />
+                    <div className="relative">
+                      <input type="text" value={newSubtask} onChange={(e) => setNewSubtask(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddSubtask()} placeholder="Adicionar nova atividade..." className="w-full bg-transparent border-dashed border-2 border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-bold text-slate-500 focus:border-indigo-500 transition-all outline-none" />
+                      <button onClick={handleAddSubtask} className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-indigo-600 text-white rounded-xl shadow-lg"><Plus size={16}/></button>
+                    </div>
                 </div>
             </div>
 
             <div className="space-y-4">
-                <label className="text-sm font-black text-slate-500 dark:text-gray-400 flex items-center gap-3 uppercase tracking-widest">Anexos & Entregas</label>
+                <div className="flex items-center justify-between">
+                    <label className="text-sm font-black text-slate-500 dark:text-gray-400 flex items-center gap-3 uppercase tracking-widest">Anexos & Revisão</label>
+                    <div className="flex gap-2">
+                        <button onClick={() => { setUploadCategory('reference'); fileInputRef.current?.click(); }} className="px-4 py-2 bg-slate-100 dark:bg-[#1e232d] text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-[#2a303c] transition-all hover:bg-slate-200">Referência</button>
+                        <button onClick={() => { setUploadCategory('deliverable'); fileInputRef.current?.click(); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all hover:bg-indigo-700">+ Entregável</button>
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {editedTask.attachments?.map(att => (
-                        <div key={att.id} className="bg-slate-50 dark:bg-[#151a21]/40 border border-slate-200 dark:border-[#2a303c] p-4 rounded-2xl flex items-center gap-4 transition-all hover:border-indigo-500/50">
-                            {att.type === 'image' ? <ImageIcon className="text-indigo-500" size={24}/> : <Paperclip className="text-slate-400" size={24}/>}
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{att.name}</p>
-                                <p className="text-[10px] text-gray-500 uppercase font-black">{att.category}</p>
+                        <div 
+                          key={att.id} 
+                          onClick={() => att.type === 'video' && setReviewingVideo(att)}
+                          className={`bg-slate-50/50 dark:bg-[#151a21]/40 border border-slate-200 dark:border-[#2a303c] p-4 rounded-3xl flex flex-col gap-3 group transition-all relative ${att.type === 'video' ? 'cursor-pointer hover:border-indigo-500' : ''}`}
+                        >
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-600">
+                                    {att.type === 'image' ? <ImageIcon size={24}/> : att.type === 'video' ? <Film size={24}/> : <Paperclip size={24}/>}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{att.name}</p>
+                                    <p className="text-[9px] text-gray-500 uppercase font-black">{att.category === 'deliverable' ? 'Entrega Final' : 'Arquivo de Apoio'}</p>
+                                </div>
+                                <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${att.status === 'approved' ? 'bg-green-500/10 text-green-500' : att.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'}`}>{att.status.toUpperCase()}</span>
                             </div>
-                            <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${att.status === 'approved' ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>{att.status.toUpperCase()}</span>
+                            {att.status === 'rejected' && att.feedback && (
+                                <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-[11px] text-red-600 dark:text-red-400 font-bold leading-relaxed">
+                                    <AlertCircle size={12} className="inline mr-1" /> {att.feedback}
+                                </div>
+                            )}
+                            <button onClick={(e) => { e.stopPropagation(); handleSaveField('attachments', editedTask.attachments.filter(a => a.id !== att.id)); }} className="absolute -top-2 -right-2 w-6 h-6 bg-white dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md"><X size={12}/></button>
                         </div>
                     ))}
-                    <button onClick={() => triggerUpload('deliverable')} className="p-4 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-2xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-indigo-500 hover:border-indigo-500 transition-all">
-                        <Upload size={24} />
-                        <span className="text-xs font-black uppercase tracking-widest">Subir Arquivo</span>
-                        <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-                    </button>
+                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
                 </div>
             </div>
 
             <div className="space-y-6 pt-6 border-t border-slate-200 dark:border-[#2a303c]">
-                <label className="text-sm font-black text-slate-500 dark:text-gray-400 flex items-center gap-3 uppercase tracking-widest">Discussão</label>
+                <label className="text-sm font-black text-slate-500 dark:text-gray-400 flex items-center gap-3 uppercase tracking-widest">Discussão do Time</label>
                 <div className="space-y-6">
                     {editedTask.comments?.map(c => {
                         const commenter = users.find(u => u.id === c.userId);
@@ -267,17 +337,20 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         );
                     })}
                 </div>
-                <div className="flex gap-4">
-                    <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Escreva um comentário..." className="w-full p-5 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-3xl text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-indigo-500 outline-none resize-none transition-colors" rows={2} />
-                    <button onClick={handleCommentSubmit} className="p-4 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 self-end transition-all hover:scale-105 active:scale-95"><Send size={20} /></button>
+                <div className="flex gap-4 items-start">
+                    <img src={currentUser.avatar} className="w-10 h-10 rounded-full border border-slate-200 dark:border-[#2a303c]" />
+                    <div className="flex-1 relative">
+                        <textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Escreva sua opinião aqui..." className="w-full p-5 pr-14 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-3xl text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-indigo-500 outline-none resize-none transition-colors" rows={2} />
+                        <button onClick={handleCommentSubmit} className="absolute right-3 bottom-3 p-3 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 shadow-lg transition-all"><Send size={18} /></button>
+                    </div>
                 </div>
             </div>
           </div>
 
           {/* SIDEBAR */}
-          <div className="w-full md:w-[400px] p-10 space-y-10 bg-slate-50 dark:bg-[#0b0e11] border-l border-slate-200 dark:border-[#2a303c] transition-colors duration-300">
+          <div className="w-full md:w-[400px] p-10 space-y-10 bg-slate-50 dark:bg-[#0b0e11] border-l border-slate-200 dark:border-[#2a303c] transition-colors duration-300 overflow-y-auto custom-scrollbar">
              <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cronômetro</label>
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Cronômetro de Produção</label>
                 <div className={`p-8 rounded-[32px] border transition-all ${!isDraft ? 'bg-white dark:bg-[#151a21] border-indigo-500/30 shadow-sm' : 'bg-slate-200/20 dark:bg-white/5 border-slate-200 dark:border-[#2a303c]'}`}>
                     <div className="flex items-center gap-5">
                       <div className={`w-12 h-12 rounded-full flex items-center justify-center ${!isDraft ? 'bg-indigo-600/10 text-indigo-600 dark:text-indigo-400' : 'bg-slate-200 dark:bg-gray-800 text-slate-400'}`}>
@@ -285,27 +358,52 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       </div>
                       <div>
                           <h4 className="text-2xl font-black text-slate-900 dark:text-white tracking-tighter leading-tight">{timeRemaining}</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase">{isDraft ? 'AGUARDANDO CRIAÇÃO' : 'STATUS DA PRODUÇÃO'}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase">{isDraft ? 'AGUARDANDO CRIAÇÃO' : 'TEMPO ATUAL EM PRODUÇÃO'}</p>
                       </div>
                     </div>
                 </div>
              </div>
 
              <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Responsável</label>
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Prioridade</label>
+                <div className="relative">
+                    <select value={editedTask.priority} onChange={(e) => handleSaveField('priority', e.target.value as TaskPriority)} className="w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none appearance-none focus:ring-1 focus:ring-indigo-500">
+                        {Object.values(TaskPriority).map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                    <ChevronDown size={18} className="absolute right-5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                </div>
+             </div>
+
+             <div className="space-y-4">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Membro Responsável</label>
                 <div className="relative">
                     <UserIcon size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <select value={editedTask.assigneeId} onChange={(e) => handleSaveField('assigneeId', e.target.value)} className="w-full p-5 pl-14 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none appearance-none focus:ring-1 focus:ring-indigo-500 transition-all">
+                    <select value={editedTask.assigneeId} onChange={(e) => handleSaveField('assigneeId', e.target.value)} className="w-full p-5 pl-14 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none appearance-none focus:ring-1 focus:ring-indigo-500">
                         {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                 </div>
              </div>
 
              <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Vencimento</label>
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Prazo Final</label>
                 <div className="relative">
                     <Calendar size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="datetime-local" value={new Date(editedTask.dueDate).toISOString().slice(0, 16)} onChange={(e) => handleSaveField('dueDate', new Date(e.target.value).getTime())} className="w-full p-5 pl-14 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500 transition-all" />
+                    <input type="datetime-local" value={new Date(editedTask.dueDate).toISOString().slice(0, 16)} onChange={(e) => handleSaveField('dueDate', new Date(e.target.value).getTime())} className="w-full p-5 pl-14 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500" />
+                </div>
+             </div>
+
+             <div className="space-y-4">
+                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Tags de Projeto</label>
+                <div className="flex flex-wrap gap-2">
+                    {editedTask.tags.map(t => (
+                        <span key={t} className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl text-[10px] font-bold flex items-center gap-1">
+                            {t} <button onClick={() => handleSaveField('tags', editedTask.tags.filter(tag => tag !== t))}><X size={12}/></button>
+                        </span>
+                    ))}
+                </div>
+                <div className="relative">
+                  <Tag size={16} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input type="text" value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddTag()} placeholder="Adicionar tag..." className="w-full p-4 pl-12 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-xs font-bold outline-none" />
                 </div>
              </div>
 
@@ -314,17 +412,71 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                  {isDraft && onCreate && (
                    <button onClick={() => onCreate(editedTask)} className="flex-[2] py-5 text-xs font-black text-white bg-[#22c55e] rounded-2xl shadow-lg shadow-green-500/20 uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Criar Projeto</button>
                  )}
+                 {!isDraft && (
+                    <button onClick={onClose} className="flex-[2] py-5 text-xs font-black text-white bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-500/20 uppercase tracking-widest transition-all">Confirmar Ajustes</button>
+                 )}
              </div>
           </div>
         </div>
       </div>
+
+      {/* VIDEO REVIEW MODAL (RESTAURADO) */}
+      {reviewingVideo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-6 overflow-hidden animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-[#0b0e11] w-full max-w-[95vw] h-[90vh] rounded-[40px] border border-slate-200 dark:border-[#2a303c] flex flex-col md:flex-row overflow-hidden shadow-2xl">
+            {/* Player Area */}
+            <div className="flex-1 bg-black flex items-center justify-center relative border-r border-slate-200 dark:border-[#2a303c]">
+              <button onClick={() => setReviewingVideo(null)} className="absolute top-8 right-8 z-50 p-3 bg-white/5 text-white rounded-2xl hover:bg-white/10 transition-colors border border-white/10"><X size={24} /></button>
+              <video ref={videoRef} src={reviewingVideo.url} className="w-full h-full object-contain" onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime || 0)} onLoadedMetadata={() => setDuration(videoRef.current?.duration || 0)} />
+              {/* Controls Overlay */}
+              <div className="absolute bottom-0 left-0 right-0 p-10 bg-gradient-to-t from-black/80 to-transparent">
+                <div className="flex flex-col gap-6">
+                  <div className="relative h-2 bg-white/10 rounded-full cursor-pointer overflow-visible">
+                    <div className="absolute top-0 left-0 h-full bg-indigo-500 rounded-full" style={{ width: `${(currentTime / duration) * 100}%` }} />
+                    {reviewingVideo.feedback && parseFeedback(reviewingVideo.feedback).map((fb, idx) => {
+                      const timeSecs = (fb.time.split(':').map(Number)[0] * 60) + fb.time.split(':').map(Number)[1];
+                      const pct = (timeSecs / duration) * 100;
+                      return <div key={idx} onClick={(e) => { e.stopPropagation(); jumpToTime(fb.time); }} className="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-amber-400 rounded-full border-2 border-[#0b0e11] cursor-pointer hover:scale-125 transition-all shadow-lg" style={{ left: `${pct}%` }} title={fb.note} />;
+                    })}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-6">
+                      <button onClick={() => { if (videoRef.current?.paused) { videoRef.current.play(); setIsPlaying(true); } else { videoRef.current?.pause(); setIsPlaying(false); } }} className="text-white hover:text-indigo-400 transition-colors">
+                        {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" />}
+                      </button>
+                      <span className="text-sm font-mono text-white font-bold">{formatTime(currentTime)} / {formatTime(duration)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Marking List Area */}
+            <div className="w-full md:w-[450px] p-10 bg-white dark:bg-[#0b0e11] flex flex-col overflow-hidden transition-colors">
+               <div className="mb-10">
+                  <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Revisão Técnica</h3>
+                  <p className="text-sm text-slate-500 dark:text-gray-400 font-medium truncate">{reviewingVideo.name}</p>
+               </div>
+               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+                  <label className="text-[10px] font-black text-slate-400 dark:text-gray-600 uppercase tracking-widest block mb-4">Marcações de Ajuste</label>
+                  {reviewingVideo.feedback ? parseFeedback(reviewingVideo.feedback).map((fb, idx) => (
+                    <div key={idx} onClick={() => jumpToTime(fb.time)} className="p-5 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl hover:border-amber-500/50 cursor-pointer transition-all group">
+                      <div className="flex items-center gap-3 mb-2">
+                        <span className="font-mono text-[10px] font-black px-2 py-1 bg-amber-500/10 text-amber-600 dark:text-amber-50 rounded border border-amber-500/20">{fb.time}</span>
+                        <Target size={14} className="text-slate-400 dark:text-gray-600 group-hover:text-amber-500 transition-colors" />
+                      </div>
+                      <p className="text-sm text-slate-700 dark:text-gray-300 leading-relaxed font-medium">{fb.note}</p>
+                    </div>
+                  )) : <p className="text-sm text-gray-500 italic">Sem notas específicas registradas.</p>}
+               </div>
+               <div className="pt-10 border-t border-slate-200 dark:border-[#2a303c]">
+                  <button onClick={() => setReviewingVideo(null)} className="w-full py-5 bg-slate-100 dark:bg-[#151a21] text-slate-500 dark:text-gray-400 font-black rounded-2xl border border-slate-200 dark:border-[#2a303c] text-xs uppercase tracking-widest hover:text-slate-900 dark:hover:text-white transition-all">Fechar Visualizador</button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{` .animate-spin-slow { animation: spin 8s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } `}</style>
     </div>
   );
 };
-
-// Helper: triggerUpload
-function triggerUpload(category: string) {
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    if (input) input.click();
-}
