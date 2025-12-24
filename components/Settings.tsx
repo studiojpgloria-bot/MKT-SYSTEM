@@ -41,7 +41,10 @@ export const Settings: React.FC<SettingsProps> = ({
     setLocalSettings(settings);
   }, [settings]);
 
-  const handleSaveSettings = () => onUpdateSettings(localSettings);
+  const handleSaveSettings = () => {
+      // Garante que o ID único de persistência seja mantido
+      onUpdateSettings({ ...localSettings, id: 'global-config' });
+  };
   
   const handleSaveWorkflow = () => onUpdateWorkflow(localWorkflow);
 
@@ -79,7 +82,7 @@ export const Settings: React.FC<SettingsProps> = ({
 
   const handleRemoveUser = (id: string) => {
     if (id === currentUser.id) return alert("Você não pode remover a si mesmo.");
-    if (confirm("Deseja realmente remover este membro?")) {
+    if (confirm("Deseja realmente remover este membro? Isso afetará o banco de dados.")) {
         onUpdateUsers(users.filter(u => u.id !== id));
     }
   };
@@ -165,7 +168,7 @@ export const Settings: React.FC<SettingsProps> = ({
       onClick={onClick}
       className={`flex items-center gap-3 px-10 py-5 ${activeTheme.bg} text-white rounded-[24px] font-black shadow-lg ${activeTheme.shadow} text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 mt-10 self-end`}
     >
-      <Save size={18} /> SALVAR ALTERAÇÕES
+      <Save size={18} /> SALVAR ALTERAÇÕES NO BANCO
     </button>
   );
 

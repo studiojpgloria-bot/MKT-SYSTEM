@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Task, User, UserRole, WorkflowStage, SystemSettings, Notification, 
-  CalendarEvent, Document, TaskStage, Attachment, TaskPriority, MindMapDocument, MindMapNode
+  CalendarEvent, Document, TaskStage, Attachment, TaskPriority, MindMapDocument, MindMapNode,
+  Comment
 } from './types';
 import { 
   MOCK_USERS, INITIAL_TASKS, INITIAL_EVENTS, INITIAL_SETTINGS, INITIAL_DOCUMENTS 
@@ -55,69 +56,27 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
-  useEffect(() => {
-    if (!currentUser) return;
-    const roleBasedAccess: Record<string, UserRole[]> = {
-      'dashboard': [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER],
-      'crm': [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER],
-      'calendar': [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER],
-      'documents': [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER],
-      'approvals': [UserRole.ADMIN, UserRole.MANAGER],
-      'reports': [UserRole.ADMIN, UserRole.MANAGER],
-      'settings': [UserRole.ADMIN]
-    };
-    if (roleBasedAccess[currentView] && !roleBasedAccess[currentView].includes(currentUser.role)) {
-      setCurrentView('dashboard');
-    }
-  }, [currentUser, currentView]);
-
-  useEffect(() => {
-    if (settings.darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [settings.darkMode]);
-
-  useEffect(() => {
-    localStorage.setItem('nexus_view', currentView);
-  }, [currentView]);
-
   const addNotification = async (notif: Omit<Notification, 'id' | 'timestamp' | 'read'>) => {
-    const newNotif = {
-      ...notif,
-      id: `notif-${Date.now()}`,
-      timestamp: Date.now(),
-      read: false
-    };
-    // Persistência no banco para todos os usuários
+    const newNotif = { ...notif, id: `notif-${Date.now()}`, timestamp: Date.now(), read: false };
     await supabase.from('notifications').insert([newNotif]);
-  };
-
-  const handleLogin = (user: User) => {
-    setCurrentUser(user);
-    localStorage.setItem('nexus_user', JSON.stringify(user));
-    setCurrentView('dashboard');
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('nexus_user');
-    localStorage.removeItem('nexus_view');
   };
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data: settingsData } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
-      if (settingsData) setSettings(prev => ({ ...prev, ...settingsData }));
+      if (settingsData) setSettings(settingsData);
+      else await supabase.from('system_settings').upsert([{ ...INITIAL_SETTINGS, id: 'global-config' }]);
 
-      const { data: flowData } = await supabase.from('workflow_stages').select('*');
+      const { data: flowData } = await supabase.from('workflow_stages').select('*').order('id');
       if (flowData && flowData.length > 0) setWorkflow(flowData);
 
       const { data: userData } = await supabase.from('users_profiles').select('*');
       if (userData && userData.length > 0) setUsers(userData.map(u => ({ ...u, lastSeen: Date.now() })));
-      else setUsers(MOCK_USERS);
+      else {
+          setUsers(MOCK_USERS);
+          await supabase.from('users_profiles').upsert(MOCK_USERS);
+      }
 
       const { data: taskData } = await supabase.from('tasks').select('*');
       if (taskData) setTasks(taskData);
@@ -129,11 +88,11 @@ export const App: React.FC = () => {
       if (eventData) setEvents(eventData);
 
       if (currentUser) {
-        const { data: notifData } = await supabase.from('notifications').select('*').eq('userId', currentUser.id).order('timestamp', { ascending: false }).limit(20);
+        const { data: notifData } = await supabase.from('notifications').select('*').eq('userId', currentUser.id).order('timestamp', { ascending: false }).limit(10);
         if (notifData) setNotifications(notifData);
       }
     } catch (err) {
-      console.error("Fetch Error:", err);
+      console.error("Sync Error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -141,90 +100,45 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     fetchAllData();
-    
-    const mainChannel = supabase.channel('nexus-realtime')
+    const mainChannel = supabase.channel('nexus-global-sync')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
         if (payload.eventType === 'INSERT') setTasks(prev => [...prev, payload.new as Task]);
         else if (payload.eventType === 'UPDATE') setTasks(prev => prev.map(t => t.id === payload.new.id ? { ...t, ...payload.new } : t));
         else if (payload.eventType === 'DELETE') setTasks(prev => prev.filter(t => t.id !== payload.old.id));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'users_profiles' }, (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          setUsers(prev => {
-            const exists = prev.find(u => u.id === payload.new.id);
-            if (exists) return prev.map(u => u.id === payload.new.id ? { ...u, ...payload.new } : u);
-            return [...prev, payload.new as User];
-          });
-          // Se for o próprio usuário, atualiza o localStorage
-          if (currentUser && payload.new.id === currentUser.id) {
-            const updatedUser = { ...currentUser, ...payload.new };
-            setCurrentUser(updatedUser);
-            localStorage.setItem('nexus_user', JSON.stringify(updatedUser));
-          }
-        } else if (payload.eventType === 'DELETE') {
-          setUsers(prev => prev.filter(u => u.id !== payload.old.id));
-        }
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
-          const newNotif = payload.new as Notification;
-          if (currentUser && newNotif.userId === currentUser.id) {
-              setNotifications(prev => [newNotif, ...prev]);
-              setActiveToast(newNotif);
-          }
-      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'system_settings' }, (payload) => {
-          if (payload.new.id === 'global-config') setSettings(prev => ({ ...prev, ...payload.new }));
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_stages' }, () => {
-          supabase.from('workflow_stages').select('*').then(({ data }) => { if (data) setWorkflow(data); });
+          if (payload.new.id === 'global-config') setSettings(payload.new as SystemSettings);
       })
       .subscribe();
-      
     return () => { supabase.removeChannel(mainChannel); };
   }, [currentUser, fetchAllData]);
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
-      // Notifica o usuário se o assignee mudar
-      const oldTask = tasks.find(t => t.id === taskId);
-      if (updates.assigneeId && oldTask && updates.assigneeId !== oldTask.assigneeId) {
-          const newAssignee = users.find(u => u.id === updates.assigneeId);
-          if (newAssignee && currentUser) {
-              addNotification({
-                  userId: newAssignee.id,
-                  title: 'Nova Atribuição',
-                  message: `${currentUser.name} atribuiu a tarefa "${updates.title || oldTask.title}" a você.`,
-                  type: 'info'
-              });
-          }
-      }
-
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
-      await supabase.from('tasks').update(updates).eq('id', taskId);
+      const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
+      if (error) fetchAllData();
   };
 
   const handleAddComment = async (taskId: string, text: string) => {
-      if (!currentUser) return;
-      const task = tasks.find(t => t.id === taskId);
-      if (!task) return;
-      const newComment = { id: Date.now().toString(), userId: currentUser.id, text, timestamp: Date.now() };
-      const updatedComments = [...(task.comments || []), newComment];
-      handleTaskUpdate(taskId, { comments: updatedComments });
-      if (task.assigneeId !== currentUser.id) {
-          addNotification({ userId: task.assigneeId, title: 'Novo Comentário', message: `${currentUser.name} comentou em "${task.title}"`, type: 'info' });
-      }
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || !currentUser) return;
+    const newComment: Comment = { id: `c-${Date.now()}`, userId: currentUser.id, text, timestamp: Date.now() };
+    const updatedComments = [...(task.comments || []), newComment];
+    await handleTaskUpdate(taskId, { comments: updatedComments });
   };
 
-  const handleUpdateUsers = async (updatedUsers: User[]) => {
-      setUsers(updatedUsers);
-      // Sincroniza cada usuário modificado com o banco
-      for (const u of updatedUsers) {
-          await supabase.from('users_profiles').upsert([u]);
-      }
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    localStorage.setItem('nexus_user', JSON.stringify(user));
+    setCurrentView('dashboard');
   };
 
-  if (!currentUser) {
-    return <Login users={users} onLogin={handleLogin} settings={settings} onSystemInit={() => {}} />;
-  }
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('nexus_user');
+  };
+
+  if (!currentUser) return <Login users={users} onLogin={handleLogin} settings={settings} onSystemInit={() => {}} />;
 
   return (
     <Layout
@@ -238,10 +152,10 @@ export const App: React.FC = () => {
         }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         settings={settings}
-        onToggleTheme={() => { 
-          const updated = {...settings, darkMode: !settings.darkMode}; 
+        onToggleTheme={async () => { 
+          const updated = {...settings, darkMode: !settings.darkMode, id: 'global-config'}; 
           setSettings(updated); 
-          supabase.from('system_settings').upsert([{ ...updated, id: 'global-config' }]); 
+          await supabase.from('system_settings').upsert([updated]); 
         }}
         notifications={notifications}
         onNotificationClick={async (n) => {
@@ -253,65 +167,35 @@ export const App: React.FC = () => {
           await supabase.from('notifications').delete().eq('userId', currentUser.id);
         }}
     >
-        {activeToast && (
-            <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right duration-300">
-                <NotificationToast 
-                    notification={activeToast} 
-                    onClose={() => setActiveToast(null)} 
-                    onClick={(n) => { 
-                        if (n.resourceId) { 
-                            const t = tasks.find(task => task.id === n.resourceId);
-                            if (t) { setSelectedTask(t); setIsTaskModalOpen(true); }
-                        }
-                        setActiveToast(null);
-                    }} 
-                />
-            </div>
-        )}
-
-        {currentView === 'dashboard' && <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={async (s) => { const updated = {...currentUser, status: s}; setCurrentUser(updated); localStorage.setItem('nexus_user', JSON.stringify(updated)); await supabase.from('users_profiles').upsert([{ id: currentUser.id, status: s }]); }} onNavigate={setCurrentView} />}
-        
+        {currentView === 'dashboard' && <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={() => {}} onNavigate={setCurrentView} />}
         {currentView === 'crm' && <KanbanBoard tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} onUpdateTask={handleTaskUpdate} onTaskClick={(tid) => { setSelectedTask(tasks.find(t => t.id === tid)!); setIsTaskModalOpen(true); }} onDeleteTask={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); }} onExportTask={() => {}} onNewTask={(stage) => {
             const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Projeto', tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
             setSelectedTask(newTask); setIsTaskModalOpen(true);
         }} />}
-        
         {currentView === 'calendar' && <CalendarView events={events} users={users} onAddEvent={async (e) => { setEvents(p => [...p, e]); await supabase.from('calendar_events').insert([e]); }} onUpdateEvent={async (id, updates) => { setEvents(p => p.map(ev => ev.id === id ? { ...ev, ...updates } : ev)); await supabase.from('calendar_events').update(updates).eq('id', id); }} onDeleteEvent={async (id) => { setEvents(p => p.filter(ev => ev.id !== id)); await supabase.from('calendar_events').delete().eq('id', id); }} onViewTask={() => {}} themeColor={settings.themeColor} settings={settings} />}
-        
         {currentView === 'reports' && <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />}
-        
         {currentView === 'approvals' && <ApprovalCenter tasks={tasks} onApprove={async (tid, aid) => { 
             const task = tasks.find(t => t.id === tid);
             if (task) {
                 const updatedAttachments = task.attachments.map(a => a.id === aid ? { ...a, status: 'approved' } : a);
                 handleTaskUpdate(tid, { attachments: updatedAttachments as any, stage: settings.workflowRules.onApprove });
-                addNotification({ userId: task.assigneeId, title: 'Ativo Aprovado!', message: `O arquivo da tarefa "${task.title}" foi aprovado.`, type: 'success' });
             }
         }} onReject={async (tid, aid, feedback) => {
             const task = tasks.find(t => t.id === tid);
             if (task) {
                 const updatedAttachments = task.attachments.map(a => a.id === aid ? { ...a, status: 'rejected', feedback } : a);
                 handleTaskUpdate(tid, { attachments: updatedAttachments as any, stage: settings.workflowRules.onReject });
-                addNotification({ userId: task.assigneeId, title: 'Ajustes Solicitados', message: `O ativo de "${task.title}" precisa de revisões.`, type: 'warning' });
             }
         }} />}
-
-        {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { setSettings(s); await supabase.from('system_settings').upsert([{ ...s, id: 'global-config' }]); }} onUpdateUsers={handleUpdateUsers} onUpdateWorkflow={async (nw) => {
-            setWorkflow(nw);
-            try {
-              await supabase.from('workflow_stages').delete().not('id', 'is', null);
-              if (nw.length > 0) {
-                await supabase.from('workflow_stages').insert(nw);
-              }
-            } catch (err) {
-              console.error("Erro ao salvar workflow:", err);
-            }
-        }} onResetApp={() => {}} />}
-        
+        {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { 
+            const updated = { ...s, id: 'global-config' };
+            setSettings(updated); 
+            await supabase.from('system_settings').upsert([updated]); 
+        }} onUpdateUsers={async (updatedUsers) => { setUsers(updatedUsers); for (const u of updatedUsers) await supabase.from('users_profiles').upsert([u]); }} onUpdateWorkflow={async (nw) => { setWorkflow(nw); await supabase.from('workflow_stages').delete().not('id', 'is', null); if (nw.length > 0) await supabase.from('workflow_stages').insert(nw); }} onResetApp={() => {}} />}
         {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { setDocuments(p => p.filter(d => d.id !== id)); await supabase.from('documents').delete().eq('id', id); }} themeColor={settings.themeColor} />}
         
         <TaskDetailModal currentUser={currentUser} isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} task={selectedTask} allTasks={tasks} workflow={workflow} onUpdate={handleTaskUpdate} onCreate={async (t) => { setTasks(p => [...p, t]); await supabase.from('tasks').insert([t]); setIsTaskModalOpen(false); }} onAddComment={handleAddComment} onDelete={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); setIsTaskModalOpen(false); }} onAccept={(tid) => handleTaskUpdate(tid, { accepted: true, stage: settings.workflowRules.onAccept })} settings={settings} users={users} />
-        <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} currentUser={currentUser} onUpdateProfile={async (up) => { const updated = {...currentUser, ...up}; setCurrentUser(updated); localStorage.setItem('nexus_user', JSON.stringify(updated)); await supabase.from('users_profiles').upsert([{ id: currentUser.id, ...up }]); }} />
+        <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} currentUser={currentUser} onUpdateProfile={async (up) => { const updated = {...currentUser, ...up}; setCurrentUser(updated); await supabase.from('users_profiles').upsert([{ id: currentUser.id, ...up }]); }} />
         <DocumentEditorModal isOpen={isDocEditorOpen} onClose={() => setIsDocEditorOpen(false)} document={selectedDoc} onSave={async (doc) => { if(selectedDoc) { const updated = {...selectedDoc, ...doc, updatedAt: Date.now()}; setDocuments(p => p.map(d => d.id === updated.id ? updated : d)); await supabase.from('documents').update(updated).eq('id', updated.id); } else { const newDoc = {id: Date.now().toString(), createdAt: Date.now(), updatedAt: Date.now(), authorId: currentUser.id, ...doc} as Document; setDocuments(p => [...p, newDoc]); await supabase.from('documents').insert([newDoc]); } }} themeColor={settings.themeColor} tasks={tasks} users={users} currentUser={currentUser} />
     </Layout>
   );
