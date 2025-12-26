@@ -7,25 +7,27 @@
     <title>Nexus Gestão de Marketing</title>
     
     <script>
-      // BLOQUEIO CRÍTICO DE TEMA: Executa antes de qualquer renderização
+      // BLOQUEIO CRÍTICO DE TEMA: Executa no milissegundo zero
       (function() {
         try {
           const settings = JSON.parse(localStorage.getItem('nexus_settings'));
           const isDark = settings ? settings.darkMode : false;
           if (isDark) {
             document.documentElement.classList.add('dark');
+            document.documentElement.style.backgroundColor = '#0b0e11';
           } else {
             document.documentElement.classList.remove('dark');
+            document.documentElement.style.backgroundColor = '#f9fafb';
           }
         } catch (e) {}
       })();
     </script>
 
     <style>
-      /* CSS Crítico para evitar flash branco antes do Tailwind carregar */
-      :root { --bg-light: #f9fafb; --bg-dark: #0b0e11; --text-light: #0f172a; --text-dark: #ffffff; }
-      html.dark body { background-color: var(--bg-dark) !important; color: var(--text-dark) !important; }
-      html:not(.dark) body { background-color: var(--bg-light) !important; color: var(--text-light) !important; }
+      /* CSS Crítico */
+      :root { --bg-light: #f9fafb; --bg-dark: #0b0e11; }
+      html.dark { background-color: var(--bg-dark); }
+      html:not(.dark) { background-color: var(--bg-light); }
       
       .hide-scrollbar::-webkit-scrollbar { display: none; }
       .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -35,6 +37,11 @@
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
       .dark ::-webkit-scrollbar-thumb { background: #2a303c; }
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      
+      /* Evita flash de transição no load */
+      .no-transition * {
+        transition: none !important;
+      }
     </style>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -78,8 +85,16 @@
 }
 </script>
 </head>
-  <body class="bg-gray-50 dark:bg-[#0b0e11] text-slate-900 dark:text-white transition-colors duration-300">
+  <body class="bg-gray-50 dark:bg-[#0b0e11] text-slate-900 dark:text-white">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
+    <script>
+      // Adiciona transições apenas após o carregamento inicial
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          document.body.classList.add('transition-colors', 'duration-300');
+        }, 100);
+      });
+    </script>
   </body>
 </html>

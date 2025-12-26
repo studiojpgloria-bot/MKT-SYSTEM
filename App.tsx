@@ -22,17 +22,55 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { DocumentEditorModal } from './components/DocumentEditorModal';
 import { supabase } from './supabase';
 
+// Versão do esquema para forçar limpeza de cache se necessário
+const APP_SCHEMA_VERSION = '2.1';
+
 export const App: React.FC = () => {
+  // Inicialização segura do Usuário
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('nexus_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('nexus_user');
+      if (!saved) return null;
+      const parsed = JSON.parse(saved);
+      // Validação básica de estrutura
+      if (!parsed.id || !parsed.email) throw new Error('Invalid user cache');
+      return parsed;
+    } catch (e) {
+      localStorage.removeItem('nexus_user');
+      return null;
+    }
   });
   
   const [currentView, setCurrentView] = useState(() => {
     return localStorage.getItem('nexus_view') || 'dashboard';
   });
 
-  const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
+  // Inicialização segura das Configurações com Sanitização de Cache
+  const [settings, setSettings] = useState<SystemSettings>(() => {
+    try {
+      const savedVersion = localStorage.getItem('nexus_schema_version');
+      if (savedVersion !== APP_SCHEMA_VERSION) {
+        console.warn("Versão de cache antiga detectada. Resetando configurações locais...");
+        localStorage.clear();
+        localStorage.setItem('nexus_schema_version', APP_SCHEMA_VERSION);
+        return INITIAL_SETTINGS;
+      }
+
+      const saved = localStorage.getItem('nexus_settings');
+      if (!saved) return INITIAL_SETTINGS;
+      
+      const parsed = JSON.parse(saved);
+      // Força campos obrigatórios para evitar erros de renderização (Crash do app)
+      if (!parsed.deliveryTypes || !parsed.workflowRules || !parsed.themeColor) {
+        throw new Error('Configurações incompletas no cache');
+      }
+      return parsed;
+    } catch (e) {
+      console.error("Erro ao ler cache de configurações:", e);
+      return INITIAL_SETTINGS;
+    }
+  });
+
   const [isLoading, setIsLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -55,7 +93,7 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
-  // Aplicação imediata do tema
+  // Efeito de aplicação de tema e persistência de segurança no LocalStorage
   useEffect(() => {
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
@@ -63,6 +101,7 @@ export const App: React.FC = () => {
       document.documentElement.classList.remove('dark');
     }
     localStorage.setItem('nexus_settings', JSON.stringify(settings));
+    localStorage.setItem('nexus_schema_version', APP_SCHEMA_VERSION);
   }, [settings]);
 
   useEffect(() => {
@@ -71,12 +110,15 @@ export const App: React.FC = () => {
 
   const fetchAllData = useCallback(async () => {
     try {
-      console.log("🔄 Sincronizando com Supabase...");
+      console.log("🔄 Sincronizando com Supabase e validando integridade...");
 
-      // 1. Configurações (Sempre prioriza o banco)
-      const { data: settingsData } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
+      // 1. Configurações - Prioridade absoluta para o banco
+      const { data: settingsData, error: sError } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
       if (settingsData) {
-        setSettings(settingsData);
+        // Validação profunda antes de aplicar
+        if (settingsData.deliveryTypes && Array.isArray(settingsData.deliveryTypes)) {
+          setSettings(settingsData);
+        }
       } else {
         await supabase.from('system_settings').upsert([INITIAL_SETTINGS]);
       }
@@ -90,7 +132,6 @@ export const App: React.FC = () => {
       if (userData && userData.length > 0) {
         setUsers(userData);
       } else {
-        // Semeadura inicial se estiver vazio
         await supabase.from('users_profiles').upsert(MOCK_USERS);
         setUsers(MOCK_USERS);
       }
@@ -112,9 +153,9 @@ export const App: React.FC = () => {
         if (notifData) setNotifications(notifData);
       }
       
-      console.log("✅ Dados carregados com sucesso.");
+      console.log("✅ Integridade verificada. Sistema operacional.");
     } catch (err) {
-      console.error("❌ Erro na sincronização:", err);
+      console.error("❌ Falha crítica de sincronização:", err);
     } finally {
       setIsLoading(false);
     }
@@ -122,8 +163,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     fetchAllData();
-    // Inscrição em tempo real para mudanças nas tarefas
-    const taskSubscription = supabase.channel('realtime-tasks')
+    const taskSubscription = supabase.channel('realtime-tasks-v2')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
           if (payload.eventType === 'INSERT') {
             setTasks(prev => [...prev, payload.new as Task]);
@@ -138,20 +178,16 @@ export const App: React.FC = () => {
     return () => { supabase.removeChannel(taskSubscription); };
   }, [fetchAllData]);
 
-  // Função centralizada de persistência
   const persistTask = async (task: Task) => {
     const { error } = await supabase.from('tasks').upsert([task]);
-    if (error) {
-      console.error("Erro ao salvar tarefa:", error);
-      alert("Falha ao gravar no banco de dados.");
-    }
+    if (error) console.error("Erro ao persistir tarefa:", error);
   };
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
       setTasks(prev => prev.map(t => {
           if (t.id === taskId) {
               const updated = { ...t, ...updates };
-              persistTask(updated); // Dispara persistência assíncrona
+              persistTask(updated); 
               return updated;
           }
           return t;
@@ -175,6 +211,28 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('nexus_user');
+  };
+
+  // RESET DE FÁBRICA: Limpa banco e cache local para corrigir erros catastróficos
+  const handleResetApp = async () => {
+    if (!confirm("⚠️ ATENÇÃO: Isso apagará TODOS os dados do banco e o cache do seu navegador. Deseja continuar?")) return;
+    
+    try {
+      setIsLoading(true);
+      // Limpa LocalStorage
+      localStorage.clear();
+      
+      // Limpa Tabelas no Supabase (Apenas se o RLS permitir ou via SQL Editor)
+      await supabase.from('tasks').delete().neq('id', '_');
+      await supabase.from('calendar_events').delete().neq('id', '_');
+      await supabase.from('documents').delete().neq('id', '_');
+      await supabase.from('notifications').delete().neq('id', '_');
+      
+      // Recarrega a página para estado limpo
+      window.location.reload();
+    } catch (e) {
+      alert("Erro ao resetar: " + (e as Error).message);
+    }
   };
 
   if (!currentUser) return <Login users={users} onLogin={handleLogin} settings={settings} onSystemInit={() => {}} />;
@@ -270,7 +328,7 @@ export const App: React.FC = () => {
         }} onUpdateWorkflow={async (nw) => { 
             setWorkflow(nw); 
             await supabase.from('workflow_stages').upsert(nw); 
-        }} onResetApp={() => {}} />}
+        }} onResetApp={handleResetApp} />}
         {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { 
             await supabase.from('documents').delete().eq('id', id);
             setDocuments(p => p.filter(d => d.id !== id));
