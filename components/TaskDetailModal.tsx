@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Calendar, Send, CheckCircle, Clock, Timer, Plus, CheckSquare, ChevronDown, User as UserIcon, ImageIcon, Film, Paperclip, Target, Tag, Briefcase, Hash, Trash2, Eye, Download, Play, Pause, FileText } from 'lucide-react';
+import { X, Calendar, Send, CheckCircle, Clock, Timer, Plus, CheckSquare, ChevronDown, User as UserIcon, ImageIcon, Film, Paperclip, Target, Tag, Briefcase, Hash, Trash2, Eye, Download, Play, Pause, FileText, Loader2 } from 'lucide-react';
 import { Task, TaskPriority, User, UserRole, WorkflowStage, Subtask, SystemSettings, Attachment } from '../types';
+import { supabase } from '../supabase';
 
 interface TaskDetailModalProps {
   task: Task | null;
@@ -42,6 +43,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [isTimeLow, setIsTimeLow] = useState<boolean>(false);
   const [uploadCategory, setUploadCategory] = useState<'deliverable' | 'reference'>('deliverable');
   const [previewFile, setPreviewFile] = useState<Attachment | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -54,7 +56,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const isAdminOrManager = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.MANAGER;
   const isApproved = !isDraft && (editedTask?.stage === 'approved' || editedTask?.stage === 'published');
 
-  // Extrair data de criação a partir do ID (assumindo t-timestamp)
   const creationDate = useMemo(() => {
     if (!editedTask) return null;
     const parts = editedTask.id.split('-');
@@ -76,7 +77,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 const h = Math.floor(diff / (1000 * 60 * 60));
                 const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
                 setTimeRemaining(`${h}h ${m}m`);
-                // Consideramos tempo baixo se faltar menos de 1 hora
                 setIsTimeLow(h < 1);
             }
         };
@@ -101,36 +101,56 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     if (!isDraft) onUpdate(editedTask.id, { [field]: value });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `tasks/${editedTask.id}/${fileName}`;
+
+      // Upload para o Bucket 'attachments' (deve ser criado no Supabase)
+      const { data, error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // Pegar URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath);
+
       const isRef = uploadCategory === 'reference';
       const newAttachment: Attachment = {
         id: `att-${Date.now()}`,
         name: file.name,
-        url: URL.createObjectURL(file),
+        url: publicUrl,
         type: file.type.includes('image') ? 'image' : file.type.includes('video') ? 'video' : 'pdf',
         source: 'local',
         category: uploadCategory,
         uploadedBy: currentUser.id,
         status: isRef ? 'approved' : 'pending'
       };
+
       const updatedAttachments = [...(editedTask.attachments || []), newAttachment];
       let nextStage = editedTask.stage;
       if (!isRef && !isDraft) nextStage = settings?.workflowRules.onDeliverableUpload || 'review';
+      
       handleSaveField('attachments', updatedAttachments);
       if (!isDraft && nextStage !== editedTask.stage) handleSaveField('stage', nextStage);
+      
+    } catch (error: any) {
+      alert('Erro ao fazer upload: ' + error.message);
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleDownload = (file: Attachment) => {
-    const link = window.document.createElement('a');
-    link.href = file.url;
-    link.download = file.name;
-    link.target = '_blank';
-    window.document.body.appendChild(link);
-    link.click();
-    window.document.body.removeChild(link);
+    window.open(file.url, '_blank');
   };
 
   const currentStage = workflow.find(s => s.id === editedTask.stage);
@@ -278,15 +298,17 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     <div className="flex gap-3">
                         <button 
                           onClick={() => { setUploadCategory('reference'); fileInputRef.current?.click(); }} 
-                          className="px-4 py-2 bg-slate-100 dark:bg-[#1e232d] text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-[#2a303c] hover:bg-slate-200 dark:hover:bg-white/5 transition-all"
+                          disabled={isUploading}
+                          className="px-4 py-2 bg-slate-100 dark:bg-[#1e232d] text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-[#2a303c] hover:bg-slate-200 dark:hover:bg-white/5 transition-all disabled:opacity-50"
                         >
-                          + REF
+                          {isUploading && uploadCategory === 'reference' ? <Loader2 className="animate-spin" size={14} /> : '+ REF'}
                         </button>
                         <button 
                           onClick={() => { setUploadCategory('deliverable'); fileInputRef.current?.click(); }} 
-                          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
+                          disabled={isUploading}
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all disabled:opacity-50"
                         >
-                          + ENTREGÁVEL
+                          {isUploading && uploadCategory === 'deliverable' ? <Loader2 className="animate-spin" size={14} /> : '+ ENTREGÁVEL'}
                         </button>
                     </div>
                 </div>
@@ -332,7 +354,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Ação Requerida</label>
                   <button 
                     onClick={() => {
-                      // Atualização otimista local para resposta instantânea no modal
                       const nextStage = settings?.workflowRules.onAccept || editedTask.stage;
                       setEditedTask(prev => prev ? { ...prev, accepted: true, stage: nextStage } : null);
                       onAccept(editedTask.id);
@@ -361,7 +382,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
              </div>
 
-             {/* DATA LIMITE DE ENTREGA (Movido conforme solicitado) */}
+             {/* DATA LIMITE DE ENTREGA */}
              <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Data Limite de Entrega</label>
                 <div className="relative">

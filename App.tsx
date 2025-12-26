@@ -55,7 +55,6 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
-  // Efeito para gerenciar a classe dark no HTML
   useEffect(() => {
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
@@ -64,7 +63,6 @@ export const App: React.FC = () => {
     }
   }, [settings.darkMode]);
 
-  // Persistir view atual
   useEffect(() => {
     localStorage.setItem('nexus_view', currentView);
   }, [currentView]);
@@ -85,7 +83,6 @@ export const App: React.FC = () => {
       const { data: taskData } = await supabase.from('tasks').select('*');
       if (taskData) {
         setTasks(taskData);
-        // Sincroniza o selectedTask com os dados novos se ele estiver aberto
         setSelectedTask(prev => {
           if (!prev) return null;
           const updated = taskData.find(t => t.id === prev.id);
@@ -122,7 +119,6 @@ export const App: React.FC = () => {
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
       
-      // Sincronização crucial: Atualiza o card selecionado no modal se for ele o alvo da alteração
       setSelectedTask(prev => {
         if (prev?.id === taskId) {
           return { ...prev, ...updates };
@@ -131,7 +127,10 @@ export const App: React.FC = () => {
       });
 
       const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
-      if (error) fetchAllData();
+      if (error) {
+          console.error("Update error:", error);
+          fetchAllData();
+      }
   };
 
   const handleAddComment = async (taskId: string, text: string) => {
@@ -209,7 +208,15 @@ export const App: React.FC = () => {
         }} onUpdateUsers={async (updatedUsers) => { setUsers(updatedUsers); for (const u of updatedUsers) await supabase.from('users_profiles').upsert([u]); }} onUpdateWorkflow={async (nw) => { setWorkflow(nw); await supabase.from('workflow_stages').delete().not('id', 'is', null); if (nw.length > 0) await supabase.from('workflow_stages').insert(nw); }} onResetApp={() => {}} />}
         {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { setDocuments(p => p.filter(d => d.id !== id)); await supabase.from('documents').delete().eq('id', id); }} themeColor={settings.themeColor} />}
         
-        <TaskDetailModal currentUser={currentUser} isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} task={selectedTask} allTasks={tasks} workflow={workflow} onUpdate={handleTaskUpdate} onCreate={async (t) => { setTasks(p => [...p, t]); await supabase.from('tasks').insert([t]); setIsTaskModalOpen(false); }} onAddComment={handleAddComment} onDelete={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); setIsTaskModalOpen(false); }} onAccept={(tid) => handleTaskUpdate(tid, { accepted: true, stage: settings.workflowRules.onAccept })} settings={settings} users={users} />
+        <TaskDetailModal currentUser={currentUser} isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} task={selectedTask} allTasks={tasks} workflow={workflow} onUpdate={handleTaskUpdate} onCreate={async (t) => { 
+          const { error } = await supabase.from('tasks').insert([t]);
+          if (error) {
+              alert("Erro ao criar card: " + error.message);
+          } else {
+              setTasks(p => [...p, t]);
+              setIsTaskModalOpen(false);
+          }
+        }} onAddComment={handleAddComment} onDelete={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); setIsTaskModalOpen(false); }} onAccept={(tid) => handleTaskUpdate(tid, { accepted: true, stage: settings.workflowRules.onAccept })} settings={settings} users={users} />
         <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} currentUser={currentUser} onUpdateProfile={async (up) => { const updated = {...currentUser, ...up}; setCurrentUser(updated); await supabase.from('users_profiles').upsert([{ id: currentUser.id, ...up }]); }} />
         <DocumentEditorModal isOpen={isDocEditorOpen} onClose={() => setIsDocEditorOpen(false)} document={selectedDoc} onSave={async (doc) => { if(selectedDoc) { const updated = {...selectedDoc, ...doc, updatedAt: Date.now()}; setDocuments(p => p.map(d => d.id === updated.id ? updated : d)); await supabase.from('documents').update(updated).eq('id', updated.id); } else { const newDoc = {id: Date.now().toString(), createdAt: Date.now(), updatedAt: Date.now(), authorId: currentUser.id, ...doc} as Document; setDocuments(p => [...p, newDoc]); await supabase.from('documents').insert([newDoc]); } }} themeColor={settings.themeColor} tasks={tasks} users={users} currentUser={currentUser} />
     </Layout>
