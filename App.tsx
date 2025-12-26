@@ -20,7 +20,6 @@ import { DocumentsView } from './components/DocumentsView';
 import { TaskDetailModal } from './components/TaskDetailModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { DocumentEditorModal } from './components/DocumentEditorModal';
-import { NotificationToast } from './components/NotificationToast';
 import { supabase } from './supabase';
 
 export const App: React.FC = () => {
@@ -33,11 +32,7 @@ export const App: React.FC = () => {
     return localStorage.getItem('nexus_view') || 'dashboard';
   });
 
-  const [settings, setSettings] = useState<SystemSettings>(() => {
-    const saved = localStorage.getItem('nexus_settings');
-    return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
-  });
-
+  const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -60,14 +55,13 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
-  // Sincroniza classe dark no HTML sempre que o settings mudar
+  // Aplicação imediata do tema
   useEffect(() => {
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-    // Salva em cache para o próximo reload ser instantâneo
     localStorage.setItem('nexus_settings', JSON.stringify(settings));
   }, [settings]);
 
@@ -77,32 +71,39 @@ export const App: React.FC = () => {
 
   const fetchAllData = useCallback(async () => {
     try {
+      console.log("🔄 Sincronizando com Supabase...");
+
+      // 1. Configurações (Sempre prioriza o banco)
       const { data: settingsData } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
       if (settingsData) {
         setSettings(settingsData);
-        localStorage.setItem('nexus_settings', JSON.stringify(settingsData));
+      } else {
+        await supabase.from('system_settings').upsert([INITIAL_SETTINGS]);
       }
 
+      // 2. Workflow
       const { data: flowData } = await supabase.from('workflow_stages').select('*').order('id');
       if (flowData && flowData.length > 0) setWorkflow(flowData);
 
+      // 3. Usuários
       const { data: userData } = await supabase.from('users_profiles').select('*');
-      if (userData && userData.length > 0) setUsers(userData.map(u => ({ ...u, lastSeen: Date.now() })));
-      else setUsers(MOCK_USERS);
-
-      const { data: taskData } = await supabase.from('tasks').select('*');
-      if (taskData) {
-        setTasks(taskData);
-        setSelectedTask(prev => {
-          if (!prev) return null;
-          const updated = taskData.find(t => t.id === prev.id);
-          return updated ? { ...prev, ...updated } : prev;
-        });
+      if (userData && userData.length > 0) {
+        setUsers(userData);
+      } else {
+        // Semeadura inicial se estiver vazio
+        await supabase.from('users_profiles').upsert(MOCK_USERS);
+        setUsers(MOCK_USERS);
       }
 
+      // 4. Tarefas
+      const { data: taskData } = await supabase.from('tasks').select('*');
+      if (taskData) setTasks(taskData);
+
+      // 5. Documentos
       const { data: docData } = await supabase.from('documents').select('*');
       if (docData) setDocuments(docData);
 
+      // 6. Eventos
       const { data: eventData } = await supabase.from('calendar_events').select('*');
       if (eventData) setEvents(eventData);
 
@@ -110,8 +111,10 @@ export const App: React.FC = () => {
         const { data: notifData } = await supabase.from('notifications').select('*').eq('userId', currentUser.id).order('timestamp', { ascending: false }).limit(10);
         if (notifData) setNotifications(notifData);
       }
+      
+      console.log("✅ Dados carregados com sucesso.");
     } catch (err) {
-      console.error("Sync Error:", err);
+      console.error("❌ Erro na sincronização:", err);
     } finally {
       setIsLoading(false);
     }
@@ -119,28 +122,40 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     fetchAllData();
-    const mainChannel = supabase.channel('nexus-global-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => fetchAllData())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'system_settings' }, () => fetchAllData())
+    // Inscrição em tempo real para mudanças nas tarefas
+    const taskSubscription = supabase.channel('realtime-tasks')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setTasks(prev => [...prev, payload.new as Task]);
+          } else if (payload.eventType === 'UPDATE') {
+            setTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new as Task : t));
+          } else if (payload.eventType === 'DELETE') {
+            setTasks(prev => prev.filter(t => t.id !== payload.old.id));
+          }
+      })
       .subscribe();
-    return () => { supabase.removeChannel(mainChannel); };
-  }, [currentUser, fetchAllData]);
+
+    return () => { supabase.removeChannel(taskSubscription); };
+  }, [fetchAllData]);
+
+  // Função centralizada de persistência
+  const persistTask = async (task: Task) => {
+    const { error } = await supabase.from('tasks').upsert([task]);
+    if (error) {
+      console.error("Erro ao salvar tarefa:", error);
+      alert("Falha ao gravar no banco de dados.");
+    }
+  };
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
-      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
-      
-      setSelectedTask(prev => {
-        if (prev?.id === taskId) {
-          return { ...prev, ...updates };
-        }
-        return prev;
-      });
-
-      const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
-      if (error) {
-          console.error("Update error:", error);
-          fetchAllData();
-      }
+      setTasks(prev => prev.map(t => {
+          if (t.id === taskId) {
+              const updated = { ...t, ...updates };
+              persistTask(updated); // Dispara persistência assíncrona
+              return updated;
+          }
+          return t;
+      }));
   };
 
   const handleAddComment = async (taskId: string, text: string) => {
@@ -148,7 +163,7 @@ export const App: React.FC = () => {
     if (!task || !currentUser) return;
     const newComment: Comment = { id: `c-${Date.now()}`, userId: currentUser.id, text, timestamp: Date.now() };
     const updatedComments = [...(task.comments || []), newComment];
-    await handleTaskUpdate(taskId, { comments: updatedComments });
+    handleTaskUpdate(taskId, { comments: updatedComments });
   };
 
   const handleLogin = (user: User) => {
@@ -160,7 +175,6 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('nexus_user');
-    // Mantemos o settings em cache para que a tela de login respeite o tema
   };
 
   if (!currentUser) return <Login users={users} onLogin={handleLogin} settings={settings} onSystemInit={() => {}} />;
@@ -172,8 +186,26 @@ export const App: React.FC = () => {
         onNavigate={setCurrentView}
         onLogout={handleLogout}
         onNewTask={() => {
-            const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage: workflow[0].id, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Projeto', projectType: 'social-media', estimatedHours: 4, tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
-            setSelectedTask(newTask); setIsTaskModalOpen(true);
+            const newTask: Task = { 
+                id: `t-${Date.now()}`, 
+                title: '', 
+                description: '', 
+                stage: workflow[0].id, 
+                priority: TaskPriority.MEDIUM, 
+                assigneeId: currentUser.id, 
+                dueDate: Date.now() + 86400000, 
+                client: 'Novo Projeto', 
+                projectType: settings.deliveryTypes[0]?.id || 'social-media', 
+                estimatedHours: 4, 
+                tags: [], 
+                subtasks: [], 
+                attachments: [], 
+                comments: [], 
+                timeSpent: 0, 
+                accepted: false 
+            };
+            setSelectedTask(newTask); 
+            setIsTaskModalOpen(true);
         }}
         onOpenProfile={() => setIsProfileModalOpen(true)}
         settings={settings}
@@ -193,11 +225,27 @@ export const App: React.FC = () => {
         }}
     >
         {currentView === 'dashboard' && <Dashboard tasks={tasks} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} users={users} notifications={notifications} onUpdateUserStatus={() => {}} onNavigate={setCurrentView} />}
-        {currentView === 'crm' && <KanbanBoard tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} onUpdateTask={handleTaskUpdate} onTaskClick={(tid) => { setSelectedTask(tasks.find(t => t.id === tid)!); setIsTaskModalOpen(true); }} onDeleteTask={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); }} onExportTask={() => {}} onNewTask={(stage) => {
-            const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Projeto', projectType: 'social-media', estimatedHours: 4, tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
+        {currentView === 'crm' && <KanbanBoard tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} currentUser={currentUser} onUpdateTask={handleTaskUpdate} onTaskClick={(tid) => { setSelectedTask(tasks.find(t => t.id === tid)!); setIsTaskModalOpen(true); }} onDeleteTask={async (tid) => { 
+            const { error } = await supabase.from('tasks').delete().eq('id', tid);
+            if (!error) setTasks(p => p.filter(t => t.id !== tid)); 
+        }} onExportTask={() => {}} onNewTask={(stage) => {
+            const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Projeto', projectType: settings.deliveryTypes[0]?.id || 'social-media', estimatedHours: 4, tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
             setSelectedTask(newTask); setIsTaskModalOpen(true);
         }} />}
-        {currentView === 'calendar' && <CalendarView events={events} users={users} onAddEvent={async (e) => { setEvents(p => [...p, e]); await supabase.from('calendar_events').insert([e]); }} onUpdateEvent={async (id, updates) => { setEvents(p => p.map(ev => ev.id === id ? { ...ev, ...updates } : ev)); await supabase.from('calendar_events').update(updates).eq('id', id); }} onDeleteEvent={async (id) => { setEvents(p => p.filter(ev => ev.id !== id)); await supabase.from('calendar_events').delete().eq('id', id); }} onViewTask={() => {}} themeColor={settings.themeColor} settings={settings} />}
+        {currentView === 'calendar' && <CalendarView events={events} users={users} onAddEvent={async (e) => { 
+            const { error } = await supabase.from('calendar_events').upsert([e]);
+            if (!error) setEvents(p => [...p, e]);
+        }} onUpdateEvent={async (id, updates) => { 
+            const event = events.find(ev => ev.id === id);
+            if (event) {
+                const updated = {...event, ...updates};
+                await supabase.from('calendar_events').upsert([updated]);
+                setEvents(p => p.map(ev => ev.id === id ? updated : ev));
+            }
+        }} onDeleteEvent={async (id) => { 
+            await supabase.from('calendar_events').delete().eq('id', id);
+            setEvents(p => p.filter(ev => ev.id !== id));
+        }} onViewTask={() => {}} themeColor={settings.themeColor} settings={settings} />}
         {currentView === 'reports' && <Reports tasks={tasks} users={users} workflow={workflow} themeColor={settings.themeColor} />}
         {currentView === 'approvals' && <ApprovalCenter tasks={tasks} onApprove={async (tid, aid) => { 
             const task = tasks.find(t => t.id === tid);
@@ -214,22 +262,53 @@ export const App: React.FC = () => {
         }} />}
         {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { 
             const updated = { ...s, id: 'global-config' };
-            setSettings(updated); 
-            await supabase.from('system_settings').upsert([updated]); 
-        }} onUpdateUsers={async (updatedUsers) => { setUsers(updatedUsers); for (const u of updatedUsers) await supabase.from('users_profiles').upsert([u]); }} onUpdateWorkflow={async (nw) => { setWorkflow(nw); await supabase.from('workflow_stages').delete().not('id', 'is', null); if (nw.length > 0) await supabase.from('workflow_stages').insert(nw); }} onResetApp={() => {}} />}
-        {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { setDocuments(p => p.filter(d => d.id !== id)); await supabase.from('documents').delete().eq('id', id); }} themeColor={settings.themeColor} />}
+            const { error } = await supabase.from('system_settings').upsert([updated]); 
+            if (!error) setSettings(updated);
+        }} onUpdateUsers={async (updatedUsers) => { 
+            setUsers(updatedUsers); 
+            await supabase.from('users_profiles').upsert(updatedUsers); 
+        }} onUpdateWorkflow={async (nw) => { 
+            setWorkflow(nw); 
+            await supabase.from('workflow_stages').upsert(nw); 
+        }} onResetApp={() => {}} />}
+        {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { 
+            await supabase.from('documents').delete().eq('id', id);
+            setDocuments(p => p.filter(d => d.id !== id));
+        }} themeColor={settings.themeColor} />}
         
         <TaskDetailModal currentUser={currentUser} isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} task={selectedTask} allTasks={tasks} workflow={workflow} onUpdate={handleTaskUpdate} onCreate={async (t) => { 
-          const { error } = await supabase.from('tasks').insert([t]);
-          if (error) {
-              alert("Erro ao criar card: " + error.message);
-          } else {
+          const { error } = await supabase.from('tasks').upsert([t]);
+          if (!error) {
               setTasks(p => [...p, t]);
               setIsTaskModalOpen(false);
           }
-        }} onAddComment={handleAddComment} onDelete={async (tid) => { setTasks(p => p.filter(t => t.id !== tid)); await supabase.from('tasks').delete().eq('id', tid); setIsTaskModalOpen(false); }} onAccept={(tid) => handleTaskUpdate(tid, { accepted: true, stage: settings.workflowRules.onAccept })} settings={settings} users={users} />
-        <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} currentUser={currentUser} onUpdateProfile={async (up) => { const updated = {...currentUser, ...up}; setCurrentUser(updated); await supabase.from('users_profiles').upsert([{ id: currentUser.id, ...up }]); }} />
-        <DocumentEditorModal isOpen={isDocEditorOpen} onClose={() => setIsDocEditorOpen(false)} document={selectedDoc} onSave={async (doc) => { if(selectedDoc) { const updated = {...selectedDoc, ...doc, updatedAt: Date.now()}; setDocuments(p => p.map(d => d.id === updated.id ? updated : d)); await supabase.from('documents').update(updated).eq('id', updated.id); } else { const newDoc = {id: Date.now().toString(), createdAt: Date.now(), updatedAt: Date.now(), authorId: currentUser.id, ...doc} as Document; setDocuments(p => [...p, newDoc]); await supabase.from('documents').insert([newDoc]); } }} themeColor={settings.themeColor} tasks={tasks} users={users} currentUser={currentUser} />
+        }} onAddComment={handleAddComment} onDelete={async (tid) => { 
+            await supabase.from('tasks').delete().eq('id', tid);
+            setTasks(p => p.filter(t => t.id !== tid)); 
+            setIsTaskModalOpen(false);
+        }} onAccept={(tid) => handleTaskUpdate(tid, { accepted: true, stage: settings.workflowRules.onAccept })} settings={settings} users={users} />
+        
+        <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} currentUser={currentUser} onUpdateProfile={async (up) => { 
+            const updated = {...currentUser, ...up}; 
+            setCurrentUser(updated); 
+            await supabase.from('users_profiles').upsert([updated]); 
+        }} />
+        
+        <DocumentEditorModal isOpen={isDocEditorOpen} onClose={() => setIsDocEditorOpen(false)} document={selectedDoc} onSave={async (doc) => { 
+            const id = selectedDoc ? selectedDoc.id : Date.now().toString();
+            const payload = {
+                id,
+                authorId: currentUser.id,
+                createdAt: selectedDoc ? selectedDoc.createdAt : Date.now(),
+                updatedAt: Date.now(),
+                ...doc
+            };
+            const { error } = await supabase.from('documents').upsert([payload]);
+            if (!error) {
+                if (selectedDoc) setDocuments(p => p.map(d => d.id === id ? payload as Document : d));
+                else setDocuments(p => [...p, payload as Document]);
+            }
+        }} themeColor={settings.themeColor} tasks={tasks} users={users} currentUser={currentUser} />
     </Layout>
   );
 };

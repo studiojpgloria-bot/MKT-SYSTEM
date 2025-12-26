@@ -44,12 +44,25 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [uploadCategory, setUploadCategory] = useState<'deliverable' | 'reference'>('deliverable');
   const [previewFile, setPreviewFile] = useState<Attachment | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDeliveryTypeOpen, setIsDeliveryTypeOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const deliveryDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (task) setEditedTask(task);
   }, [task]);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (deliveryDropdownRef.current && !deliveryDropdownRef.current.contains(event.target as Node)) {
+        setIsDeliveryTypeOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isDraft = !allTasks.some(t => t.id === task?.id);
   const isAssignee = editedTask?.assigneeId === currentUser.id;
@@ -64,7 +77,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     return new Date(ts).toLocaleDateString('pt-BR');
   }, [editedTask?.id]);
 
-  // Lógica do Cronômetro de Contagem Regressiva
   useEffect(() => {
     if (isDraft) { setTimeRemaining('Novo Projeto'); setIsTimeLow(false); return; }
     
@@ -86,7 +98,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const s = Math.floor((diff % (1000 * 60)) / 1000);
             
-            // Se faltar menos de 1 hora, mostramos segundos e ativamos o alerta vermelho
             if (h < 1) {
                 setTimeRemaining(`${m}m ${s}s`);
                 setIsTimeLow(true);
@@ -98,7 +109,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     };
 
     updateTimer();
-    const interval = setInterval(updateTimer, 1000); // Atualiza a cada segundo para precisão
+    const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [editedTask?.dueDate, editedTask?.accepted, isApproved, isAssignee, isDraft]);
 
@@ -161,6 +172,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   };
 
   const currentStage = workflow.find(s => s.id === editedTask.stage);
+  
+  // Lista de tipos de entrega sincronizada
+  const deliveryTypes = settings?.deliveryTypes || [];
+  const selectedDeliveryType = deliveryTypes.find(dt => dt.id === editedTask.projectType) || deliveryTypes[0];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 dark:bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
@@ -196,59 +211,72 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           <div className="flex-1 p-8 overflow-y-auto custom-scrollbar space-y-8 bg-white dark:bg-[#0b0e11]">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest block px-1">Cliente</label>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest block px-1">Cliente</label>
                   <input 
                     type="text" 
                     value={editedTask.client} 
                     onChange={(e) => handleSaveField('client', e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all" 
+                    className="w-full bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-gray-300 dark:placeholder:text-gray-700" 
                     placeholder="Nome do cliente"
                   />
                </div>
                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest block px-1">Título</label>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest block px-1">Título</label>
                   <input 
                     type="text" 
                     value={editedTask.title} 
                     onChange={(e) => handleSaveField('title', e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all" 
+                    className="w-full bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all placeholder:text-gray-300 dark:placeholder:text-gray-700" 
                     placeholder="O que será entregue?" 
                   />
                </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1">
+                <div className="space-y-2" ref={deliveryDropdownRef}>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2 px-1">
                     <Briefcase size={14}/> Tipo de Entrega
                   </label>
+                  
+                  {/* Seletor Customizado conforme Screenshot */}
                   <div className="relative">
-                    <select 
-                      value={editedTask.projectType} 
-                      onChange={(e) => handleSaveField('projectType', e.target.value)} 
-                      className="w-full p-4 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-700 dark:text-white outline-none appearance-none focus:ring-2 focus:ring-indigo-500/20"
+                    <button 
+                      onClick={() => setIsDeliveryTypeOpen(!isDeliveryTypeOpen)}
+                      className={`w-full p-4 flex items-center justify-between bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold transition-all focus:ring-2 focus:ring-indigo-500/20 ${isDeliveryTypeOpen ? 'border-indigo-500/50' : ''}`}
                     >
-                      {settings?.deliveryTypes && settings.deliveryTypes.length > 0 ? (
-                        settings.deliveryTypes.map(dt => (
-                          <option key={dt.id} value={dt.id}>{dt.name}</option>
-                        ))
-                      ) : (
-                        <>
-                          <option value="social-media">Social Media (Post/Story)</option>
-                          <option value="video">Edição de Vídeo</option>
-                          <option value="design">Design Gráfico</option>
-                          <option value="ads">Anúncios / Tráfego</option>
-                          <option value="copy">Redação / Copy</option>
-                        </>
-                      )}
-                    </select>
-                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <span className="text-slate-700 dark:text-white">{selectedDeliveryType?.name || 'Selecione um tipo'}</span>
+                      <ChevronDown size={18} className={`text-gray-400 transition-transform ${isDeliveryTypeOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isDeliveryTypeOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="max-h-60 overflow-y-auto custom-scrollbar py-2">
+                          {deliveryTypes.map(dt => (
+                            <button
+                              key={dt.id}
+                              onClick={() => {
+                                handleSaveField('projectType', dt.id);
+                                setIsDeliveryTypeOpen(false);
+                              }}
+                              className={`w-full px-5 py-3 text-left text-sm font-medium transition-all flex items-center justify-between group ${
+                                editedTask.projectType === dt.id 
+                                  ? 'bg-blue-500 text-white' 
+                                  : 'text-slate-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-indigo-600 dark:hover:text-white'
+                              }`}
+                            >
+                              <span>{dt.name}</span>
+                              {editedTask.projectType === dt.id && <CheckCircle size={14} className="text-white" />}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
             </div>
 
             <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest block px-1">Descrição Detalhada / Briefing</label>
+              <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest block px-1">Descrição Detalhada / Briefing</label>
               <textarea 
                 value={editedTask.description} 
                 onChange={(e) => handleSaveField('description', e.target.value)} 
@@ -258,7 +286,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
             
             <div className="space-y-3">
-                <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest flex items-center gap-2 px-1">
+                <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2 px-1">
                   <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400"/> Checklist de Atividades
                 </label>
                 <div className="space-y-2">
@@ -302,12 +330,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
             <div className="space-y-4 pt-6 border-t border-slate-100 dark:border-[#1e232d]">
                 <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest px-1">Anexos & Referências</label>
+                    <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest px-1">Anexos & Referências</label>
                     <div className="flex gap-3">
                         <button 
                           onClick={() => { setUploadCategory('reference'); fileInputRef.current?.click(); }} 
                           disabled={isUploading}
-                          className="px-4 py-2 bg-slate-100 dark:bg-[#1e232d] text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-[#2a303c] hover:bg-slate-200 dark:hover:bg-white/5 transition-all disabled:opacity-50"
+                          className="px-4 py-2 bg-slate-100 dark:bg-[#1e232d] text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 dark:border-[#2a303c] hover:bg-slate-200 dark:hover:bg-white/10 transition-all disabled:opacity-50"
                         >
                           {isUploading && uploadCategory === 'reference' ? <Loader2 className="animate-spin" size={14} /> : '+ REF'}
                         </button>
@@ -353,12 +381,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
           </div>
 
-          {/* COLUNA LATERAL - DIREITA */}
           <div className="w-full md:w-80 p-8 bg-slate-50 dark:bg-[#0b0e11] border-l border-slate-100 dark:border-[#2a303c] space-y-8 overflow-y-auto custom-scrollbar">
              
              {!editedTask.accepted && !isDraft && (isAssignee || isAdminOrManager) && (
                 <div className="space-y-3 animate-in slide-in-from-top duration-500">
-                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Ação Requerida</label>
+                  <label className="text-[10px] font-black text-gray-500 dark:text-gray-500 uppercase tracking-widest px-1">Ação Requerida</label>
                   <button 
                     onClick={() => {
                       const nextStage = settings?.workflowRules.onAccept || editedTask.stage;
@@ -374,7 +401,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
              )}
 
              <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Cronômetro de Produção</label>
+                <label className="text-[10px] font-black text-gray-500 dark:text-gray-500 uppercase tracking-widest px-1">Cronômetro de Produção</label>
                 <div className={`bg-white dark:bg-[#151a21] p-6 rounded-[28px] border ${isTimeLow ? 'border-red-500 shadow-red-500/10' : 'border-slate-200 dark:border-[#2a303c]'} shadow-sm relative overflow-hidden group transition-colors duration-500`}>
                     <div className="flex items-center gap-4 relative z-10">
                       <div className={`w-14 h-14 rounded-2xl ${isTimeLow ? 'bg-red-500/10 text-red-500' : 'bg-indigo-600/10 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'} flex items-center justify-center transition-colors duration-500`}>
@@ -389,7 +416,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
              </div>
 
              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Data Limite de Entrega</label>
+                <label className="text-[10px] font-black text-gray-500 dark:text-gray-500 uppercase tracking-widest px-1">Data Limite de Entrega</label>
                 <div className="relative">
                     <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input 
@@ -403,7 +430,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
 
              <div className="space-y-6">
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Etapa do Workflow</label>
+                    <label className="text-[10px] font-black text-gray-500 dark:text-gray-500 uppercase tracking-widest px-1">Etapa do Workflow</label>
                     <div className="relative">
                         <select 
                             value={editedTask.stage} 
@@ -417,7 +444,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Prioridade do Job</label>
+                    <label className="text-[10px] font-black text-gray-500 dark:text-gray-500 uppercase tracking-widest px-1">Prioridade do Job</label>
                     <div className="relative">
                         <select 
                             value={editedTask.priority} 
@@ -431,7 +458,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Membro Responsável</label>
+                    <label className="text-[10px] font-black text-gray-500 dark:text-gray-500 uppercase tracking-widest px-1">Membro Responsável</label>
                     <div className="relative">
                         <UserIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
                         <select 
@@ -446,7 +473,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
 
                 <div className="space-y-3">
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Tags de Identificação</label>
+                    <label className="text-[10px] font-black text-gray-500 dark:text-gray-500 uppercase tracking-widest px-1">Tags de Identificação</label>
                     <div className="flex flex-wrap gap-2">
                         {editedTask.tags.map(t => (
                             <span key={t} className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-indigo-200 dark:border-indigo-500/20 flex items-center gap-2">
