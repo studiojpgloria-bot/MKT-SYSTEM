@@ -43,7 +43,14 @@ export const INITIAL_SETTINGS: SystemSettings = {
         onDeliverableUpload: 'review',
         onApprove: 'approved',
         onReject: 'changes'
-    }
+    },
+    deliveryTypes: [
+      { id: 'social-media', name: 'Social Media (Post/Story)' },
+      { id: 'video', name: 'Edição de Vídeo' },
+      { id: 'design', name: 'Design Gráfico' },
+      { id: 'ads', name: 'Anúncios / Tráfego' },
+      { id: 'copy', name: 'Redação / Copy' }
+    ]
 };
 
 export const INITIAL_DOCUMENTS: Document[] = [];

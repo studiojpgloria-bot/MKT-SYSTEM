@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Save, User as UserIcon, Building, Palette, Shield, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon, Upload, Moon, Sun, ShieldCheck, Monitor, Lock, ChevronDown, Key, UserCircle, Globe } from 'lucide-react';
-import { SystemSettings, User, UserRole, WorkflowStage, Task } from '../types';
+import { Save, User as UserIcon, Building, Palette, Shield, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon, Upload, Moon, Sun, ShieldCheck, Monitor, Lock, ChevronDown, Key, UserCircle, Globe, Briefcase } from 'lucide-react';
+import { SystemSettings, User, UserRole, WorkflowStage, Task, DeliveryType } from '../types';
 
 interface SettingsProps {
   settings: SystemSettings;
@@ -26,7 +26,7 @@ export const Settings: React.FC<SettingsProps> = ({
   onResetApp,
   currentUser
 }) => {
-  const [activeTab, setActiveTab] = useState<'company' | 'team' | 'workflow' | 'appearance' | 'security' | 'login'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'team' | 'workflow' | 'delivery' | 'appearance' | 'security' | 'login'>('company');
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
   const [localWorkflow, setLocalWorkflow] = useState<WorkflowStage[]>(workflow);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: UserRole.MEMBER, password: '' });
@@ -109,6 +109,31 @@ export const Settings: React.FC<SettingsProps> = ({
     setLocalWorkflow(prev => [...prev, newStage]);
   };
 
+  const handleUpdateDeliveryType = (id: string, name: string) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      deliveryTypes: prev.deliveryTypes.map(d => d.id === id ? { ...d, name } : d)
+    }));
+  };
+
+  const handleDeleteDeliveryType = (id: string) => {
+    setLocalSettings(prev => ({
+      ...prev,
+      deliveryTypes: prev.deliveryTypes.filter(d => d.id !== id)
+    }));
+  };
+
+  const handleAddDeliveryType = () => {
+    const newType: DeliveryType = {
+      id: `type-${Date.now()}`,
+      name: 'Novo Tipo de Entrega'
+    };
+    setLocalSettings(prev => ({
+      ...prev,
+      deliveryTypes: [...(prev.deliveryTypes || []), newType]
+    }));
+  };
+
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -182,6 +207,7 @@ export const Settings: React.FC<SettingsProps> = ({
             <TabButton id="company" label="Empresa e Perfil" icon={Building} />
             <TabButton id="team" label="Gestão da Equipe" icon={UserIcon} />
             <TabButton id="workflow" label="Config. Workflow" icon={Layout} />
+            <TabButton id="delivery" label="Tipos de Entrega" icon={Briefcase} />
             <TabButton id="appearance" label="Aparência" icon={Palette} />
             <TabButton id="login" label="Tela de Login" icon={ImageIcon} />
             <TabButton id="security" label="Segurança e Dados" icon={Shield} />
@@ -310,6 +336,39 @@ export const Settings: React.FC<SettingsProps> = ({
                   </div>
                   <SaveButton onClick={handleSaveWorkflow} />
                </div>
+            )}
+
+            {activeTab === 'delivery' && (
+              <div className="space-y-12 animate-in fade-in duration-300 flex flex-col">
+                <div>
+                  <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Tipos de Entrega</h3>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm font-medium">Gerencie as categorias de projetos disponíveis para seleção.</p>
+                </div>
+                
+                <div className="space-y-3 max-w-2xl">
+                  {localSettings.deliveryTypes?.map((type) => (
+                    <div key={type.id} className="flex items-center gap-4 p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-[24px] group hover:border-indigo-500/30 transition-all shadow-sm">
+                      <GripVertical size={18} className="text-slate-400 dark:text-gray-600 shrink-0" />
+                      <input 
+                        value={type.name} 
+                        onChange={(e) => handleUpdateDeliveryType(type.id, e.target.value)}
+                        className="flex-1 font-black text-slate-700 dark:text-white text-sm bg-transparent border-none focus:ring-0 outline-none"
+                      />
+                      <button 
+                        onClick={() => handleDeleteDeliveryType(type.id)} 
+                        className="text-slate-400 hover:text-red-500 transition-colors p-2"
+                        title="Excluir Tipo"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))}
+                  <button onClick={handleAddDeliveryType} className={`w-full p-6 border-2 border-dashed border-slate-300 dark:border-[#2a303c] rounded-[24px] text-slate-500 dark:text-gray-400 font-black text-xs uppercase tracking-widest hover:${activeTheme.text} hover:${activeTheme.border} transition-all bg-slate-50/50 dark:bg-white/5`}>
+                    + Adicionar novo tipo de entrega
+                  </button>
+                </div>
+                <SaveButton onClick={handleSaveSettings} />
+              </div>
             )}
 
             {activeTab === 'appearance' && (

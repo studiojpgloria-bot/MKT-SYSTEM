@@ -26,6 +26,11 @@ export interface WorkflowStage {
   color: string;
 }
 
+export interface DeliveryType {
+  id: string;
+  name: string;
+}
+
 export interface WorkflowRules {
   onAccept: string;
   onDeliverableUpload: string;
@@ -54,6 +59,7 @@ export interface SystemSettings {
     bannerUrl: string;
   };
   workflowRules: WorkflowRules;
+  deliveryTypes: DeliveryType[];
 }
 
 export interface User {

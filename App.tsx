@@ -55,6 +55,20 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
+  // Efeito para gerenciar a classe dark no HTML
+  useEffect(() => {
+    if (settings.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [settings.darkMode]);
+
+  // Persistir view atual
+  useEffect(() => {
+    localStorage.setItem('nexus_view', currentView);
+  }, [currentView]);
+
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -69,7 +83,15 @@ export const App: React.FC = () => {
       else setUsers(MOCK_USERS);
 
       const { data: taskData } = await supabase.from('tasks').select('*');
-      if (taskData) setTasks(taskData);
+      if (taskData) {
+        setTasks(taskData);
+        // Sincroniza o selectedTask com os dados novos se ele estiver aberto
+        setSelectedTask(prev => {
+          if (!prev) return null;
+          const updated = taskData.find(t => t.id === prev.id);
+          return updated ? { ...prev, ...updated } : prev;
+        });
+      }
 
       const { data: docData } = await supabase.from('documents').select('*');
       if (docData) setDocuments(docData);
@@ -99,6 +121,15 @@ export const App: React.FC = () => {
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+      
+      // Sincronização crucial: Atualiza o card selecionado no modal se for ele o alvo da alteração
+      setSelectedTask(prev => {
+        if (prev?.id === taskId) {
+          return { ...prev, ...updates };
+        }
+        return prev;
+      });
+
       const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
       if (error) fetchAllData();
   };
