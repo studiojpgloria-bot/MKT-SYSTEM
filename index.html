@@ -1,13 +1,47 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nexus Gestão de Marketing</title>
+    
+    <script>
+      // BLOQUEIO CRÍTICO DE TEMA: Executa antes de qualquer renderização
+      (function() {
+        try {
+          const settings = JSON.parse(localStorage.getItem('nexus_settings'));
+          const isDark = settings ? settings.darkMode : false;
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+
+    <style>
+      /* CSS Crítico para evitar flash branco antes do Tailwind carregar */
+      :root { --bg-light: #f9fafb; --bg-dark: #0b0e11; --text-light: #0f172a; --text-dark: #ffffff; }
+      html.dark body { background-color: var(--bg-dark) !important; color: var(--text-dark) !important; }
+      html:not(.dark) body { background-color: var(--bg-light) !important; color: var(--text-light) !important; }
+      
+      .hide-scrollbar::-webkit-scrollbar { display: none; }
+      .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      .dark ::-webkit-scrollbar-track { background: #0b0e11; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .dark ::-webkit-scrollbar-thumb { background: #2a303c; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <script>
       tailwind.config = {
         darkMode: 'class',
@@ -28,35 +62,7 @@
         }
       }
     </script>
-    <style>
-      .hide-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .hide-scrollbar {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      .dark ::-webkit-scrollbar-track {
-        background: #0b0e11;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
-      }
-      .dark ::-webkit-scrollbar-thumb {
-        background: #2a303c;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
-      }
-    </style>
+    
   <script type="importmap">
 {
   "imports": {

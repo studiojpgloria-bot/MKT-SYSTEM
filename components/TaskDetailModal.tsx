@@ -64,33 +64,42 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     return new Date(ts).toLocaleDateString('pt-BR');
   }, [editedTask?.id]);
 
+  // Lógica do Cronômetro de Contagem Regressiva
   useEffect(() => {
     if (isDraft) { setTimeRemaining('Novo Projeto'); setIsTimeLow(false); return; }
-    if (editedTask?.dueDate && editedTask.accepted && !isApproved) {
-        const updateTimer = () => {
-            const diff = editedTask.dueDate - Date.now();
-            if (diff <= 0) { 
-                setTimeRemaining('Atrasado'); 
+    
+    const updateTimer = () => {
+        if (!editedTask?.dueDate || !editedTask.accepted || isApproved) {
+            if (isApproved) setTimeRemaining('Concluído');
+            else setTimeRemaining(isAssignee ? 'Aguardando Aceite' : 'Pendente');
+            setIsTimeLow(false);
+            return;
+        }
+
+        const diff = editedTask.dueDate - Date.now();
+        
+        if (diff <= 0) { 
+            setTimeRemaining('Atrasado'); 
+            setIsTimeLow(true);
+        } else {
+            const h = Math.floor(diff / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+            
+            // Se faltar menos de 1 hora, mostramos segundos e ativamos o alerta vermelho
+            if (h < 1) {
+                setTimeRemaining(`${m}m ${s}s`);
                 setIsTimeLow(true);
-            } 
-            else {
-                const h = Math.floor(diff / (1000 * 60 * 60));
-                const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            } else {
                 setTimeRemaining(`${h}h ${m}m`);
-                setIsTimeLow(h < 1);
+                setIsTimeLow(false);
             }
-        };
-        updateTimer();
-        const interval = setInterval(updateTimer, 60000);
-        return () => clearInterval(interval);
-    } else if (isApproved) { 
-        setTimeRemaining('Concluído'); 
-        setIsTimeLow(false);
-    }
-    else { 
-        setTimeRemaining(isAssignee ? 'Aguardando Aceite' : 'Pendente'); 
-        setIsTimeLow(false);
-    }
+        }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000); // Atualiza a cada segundo para precisão
+    return () => clearInterval(interval);
   }, [editedTask?.dueDate, editedTask?.accepted, isApproved, isAssignee, isDraft]);
 
   if (!isOpen || !editedTask) return null;
@@ -111,14 +120,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       const fileName = `${Math.random()}.${fileExt}`;
       const filePath = `tasks/${editedTask.id}/${fileName}`;
 
-      // Upload para o Bucket 'attachments' (deve ser criado no Supabase)
       const { data, error: uploadError } = await supabase.storage
         .from('attachments')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Pegar URL pública
       const { data: { publicUrl } } = supabase.storage
         .from('attachments')
         .getPublicUrl(filePath);
@@ -186,7 +193,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         </div>
 
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-          {/* COLUNA PRINCIPAL - ESQUERDA */}
           <div className="flex-1 p-8 overflow-y-auto custom-scrollbar space-y-8 bg-white dark:bg-[#0b0e11]">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                <div className="space-y-2">
@@ -222,9 +228,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       onChange={(e) => handleSaveField('projectType', e.target.value)} 
                       className="w-full p-4 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold text-slate-700 dark:text-white outline-none appearance-none focus:ring-2 focus:ring-indigo-500/20"
                     >
-                      {settings?.deliveryTypes?.map(dt => (
-                        <option key={dt.id} value={dt.id}>{dt.name}</option>
-                      )) || (
+                      {settings?.deliveryTypes && settings.deliveryTypes.length > 0 ? (
+                        settings.deliveryTypes.map(dt => (
+                          <option key={dt.id} value={dt.id}>{dt.name}</option>
+                        ))
+                      ) : (
                         <>
                           <option value="social-media">Social Media (Post/Story)</option>
                           <option value="video">Edição de Vídeo</option>
@@ -345,10 +353,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             </div>
           </div>
 
-          {/* COLUNA LATERAL - DIREITA (DADOS & STATUS) */}
+          {/* COLUNA LATERAL - DIREITA */}
           <div className="w-full md:w-80 p-8 bg-slate-50 dark:bg-[#0b0e11] border-l border-slate-100 dark:border-[#2a303c] space-y-8 overflow-y-auto custom-scrollbar">
              
-             {/* ACEITAR TAREFA */}
              {!editedTask.accepted && !isDraft && (isAssignee || isAdminOrManager) && (
                 <div className="space-y-3 animate-in slide-in-from-top duration-500">
                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Ação Requerida</label>
@@ -362,11 +369,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                   >
                     <CheckCircle size={18} /> ACEITAR TAREFA
                   </button>
-                  <p className="text-[9px] text-center text-gray-500 font-bold">Ao aceitar, o cronômetro será iniciado automaticamente.</p>
+                  <p className="text-[9px] text-center text-gray-500 font-bold">Ao aceitar, o cronômetro será iniciado.</p>
                 </div>
              )}
 
-             {/* CARD DE STATUS */}
              <div className="space-y-3">
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Cronômetro de Produção</label>
                 <div className={`bg-white dark:bg-[#151a21] p-6 rounded-[28px] border ${isTimeLow ? 'border-red-500 shadow-red-500/10' : 'border-slate-200 dark:border-[#2a303c]'} shadow-sm relative overflow-hidden group transition-colors duration-500`}>
@@ -376,13 +382,12 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       </div>
                       <div>
                           <h4 className={`text-xl font-black ${isTimeLow ? 'text-red-500' : 'text-slate-900 dark:text-white'} tracking-tighter leading-none transition-colors duration-500`}>{timeRemaining}</h4>
-                          <p className="text-[9px] font-bold text-gray-400 uppercase mt-1">Status Atual</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase mt-1">Tempo Restante</p>
                       </div>
                     </div>
                 </div>
              </div>
 
-             {/* DATA LIMITE DE ENTREGA */}
              <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Data Limite de Entrega</label>
                 <div className="relative">
@@ -396,7 +401,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
              </div>
 
-             {/* DADOS TÉCNICOS */}
              <div className="space-y-6">
                 <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest px-1">Etapa do Workflow</label>
@@ -464,7 +468,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 </div>
              </div>
 
-             {/* BOTÕES DE AÇÃO */}
              <div className="pt-8 flex flex-col gap-3">
                  {isDraft && onCreate ? (
                    <button 
@@ -502,7 +505,6 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         </div>
       </div>
 
-      {/* VISUALIZADOR DE ARQUIVO */}
       {previewFile && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-xl p-4 animate-in fade-in duration-300">
             <div className="relative w-full max-w-5xl h-[85vh] bg-white dark:bg-[#0b0e11] rounded-[40px] overflow-hidden flex flex-col border border-white/10 shadow-2xl">

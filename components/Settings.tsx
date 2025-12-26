@@ -32,6 +32,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [newUser, setNewUser] = useState({ name: '', email: '', role: UserRole.MEMBER, password: '' });
   
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLocalWorkflow(workflow);
@@ -42,7 +43,6 @@ export const Settings: React.FC<SettingsProps> = ({
   }, [settings]);
 
   const handleSaveSettings = () => {
-      // Garante que o ID único de persistência seja mantido
       onUpdateSettings({ ...localSettings, id: 'global-config' });
   };
   
@@ -144,7 +144,7 @@ export const Settings: React.FC<SettingsProps> = ({
       img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const size = 1000;
+        const size = 800;
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d');
@@ -153,8 +153,52 @@ export const Settings: React.FC<SettingsProps> = ({
           const sx = (img.width - minDim) / 2;
           const sy = (img.height - minDim) / 2;
           ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size);
-          const dataUrl = canvas.toDataURL('image/png');
+          const dataUrl = canvas.toDataURL('image/png', 0.8);
           setLocalSettings(prev => ({ ...prev, companyLogo: dataUrl }));
+        }
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBannerUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1920;
+        const MAX_HEIGHT = 1080;
+        let width = img.width;
+        let height = img.height;
+
+        // Preservar aspecto original da imagem, apenas limitando tamanho máximo
+        if (width / height > MAX_WIDTH / MAX_HEIGHT) {
+            if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+            }
+        } else {
+            if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+            }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          setLocalSettings(prev => ({ 
+            ...prev, 
+            loginScreen: { ...prev.loginScreen, bannerUrl: dataUrl } 
+          }));
         }
       };
     };
@@ -200,7 +244,6 @@ export const Settings: React.FC<SettingsProps> = ({
   return (
     <div className="max-w-7xl mx-auto bg-white dark:bg-[#151a21] rounded-[40px] shadow-2xl border border-slate-200 dark:border-[#2a303c] overflow-hidden flex flex-col h-[85vh] transition-colors duration-300">
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
         <div className="w-72 bg-slate-50 dark:bg-[#0b0e11] p-8 border-r border-slate-200 dark:border-[#2a303c] flex-shrink-0 overflow-y-auto custom-scrollbar transition-colors">
           <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-10 tracking-tight">Configurações</h2>
           <nav className="space-y-2">
@@ -214,7 +257,6 @@ export const Settings: React.FC<SettingsProps> = ({
           </nav>
         </div>
 
-        {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-12 bg-white dark:bg-[#151a21] custom-scrollbar flex flex-col transition-colors">
             {activeTab === 'company' && (
               <div className="space-y-8 animate-in fade-in duration-300 flex flex-col">
@@ -342,7 +384,7 @@ export const Settings: React.FC<SettingsProps> = ({
               <div className="space-y-12 animate-in fade-in duration-300 flex flex-col">
                 <div>
                   <h3 className="text-3xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Tipos de Entrega</h3>
-                  <p className="text-slate-500 dark:text-gray-400 text-sm font-medium">Gerencie as categorias de projetos disponíveis para seleção.</p>
+                  <p className="text-slate-500 dark:text-gray-400 text-sm font-medium">Gerencie as categorias de projetos disponíveis para seleção (Social Media, Vídeo, etc).</p>
                 </div>
                 
                 <div className="space-y-3 max-w-2xl">
@@ -353,6 +395,7 @@ export const Settings: React.FC<SettingsProps> = ({
                         value={type.name} 
                         onChange={(e) => handleUpdateDeliveryType(type.id, e.target.value)}
                         className="flex-1 font-black text-slate-700 dark:text-white text-sm bg-transparent border-none focus:ring-0 outline-none"
+                        placeholder="Nome do Tipo de Entrega"
                       />
                       <button 
                         onClick={() => handleDeleteDeliveryType(type.id)} 
@@ -425,8 +468,29 @@ export const Settings: React.FC<SettingsProps> = ({
                             <input type="text" value={localSettings.loginScreen.subtitle} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, subtitle: e.target.value}})} className={`w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-slate-900 dark:text-white rounded-2xl outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
                         </div>
                         <div>
-                            <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">URL do Banner Lateral</label>
-                            <input type="text" value={localSettings.loginScreen.bannerUrl} onChange={(e) => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, bannerUrl: e.target.value}})} className={`w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] text-slate-900 dark:text-white rounded-2xl outline-none font-bold placeholder:text-slate-300 dark:placeholder:text-gray-600 focus:ring-1 ${activeTheme.ring}`} placeholder="https://images.unsplash.com/..." />
+                            <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Banner Lateral (Upload)</label>
+                            <div className="space-y-4">
+                                <div className="w-full h-48 rounded-2xl bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] overflow-hidden shadow-inner relative group">
+                                    {localSettings.loginScreen.bannerUrl ? (
+                                        <img src={localSettings.loginScreen.bannerUrl} className="w-full h-full object-cover" alt="Login Banner" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                            <ImageIcon size={40} className="opacity-20" />
+                                        </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                        <button onClick={() => bannerInputRef.current?.click()} className="px-4 py-2 bg-white text-slate-900 rounded-lg text-xs font-bold uppercase tracking-widest">Alterar Imagem</button>
+                                    </div>
+                                </div>
+                                <div className="flex gap-4">
+                                    <button onClick={() => bannerInputRef.current?.click()} className={`py-3 px-6 ${activeTheme.bg} text-white rounded-xl text-xs font-black uppercase tracking-widest shadow-lg ${activeTheme.shadow} transition-all`}>Escolher Arquivo</button>
+                                    {localSettings.loginScreen.bannerUrl && (
+                                        <button onClick={() => setLocalSettings({...localSettings, loginScreen: {...localSettings.loginScreen, bannerUrl: ''}})} className="py-3 px-6 bg-red-500/10 text-red-500 rounded-xl text-xs font-black uppercase tracking-widest transition-all">Remover</button>
+                                    )}
+                                </div>
+                                <p className="text-[10px] text-slate-500 font-bold">Resolução recomendada: 1920x1080. O sistema preservará a proporção original.</p>
+                                <input type="file" ref={bannerInputRef} className="hidden" accept="image/*" onChange={handleBannerUpload} />
+                            </div>
                         </div>
                     </div>
                     <SaveButton onClick={handleSaveSettings} />

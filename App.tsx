@@ -28,16 +28,21 @@ export const App: React.FC = () => {
     const saved = localStorage.getItem('nexus_user');
     return saved ? JSON.parse(saved) : null;
   });
+  
   const [currentView, setCurrentView] = useState(() => {
     return localStorage.getItem('nexus_view') || 'dashboard';
   });
+
+  const [settings, setSettings] = useState<SystemSettings>(() => {
+    const saved = localStorage.getItem('nexus_settings');
+    return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
+  });
+
   const [isLoading, setIsLoading] = useState(true);
-  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [settings, setSettings] = useState<SystemSettings>(INITIAL_SETTINGS);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
   const [workflow, setWorkflow] = useState<WorkflowStage[]>([
@@ -55,23 +60,28 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
+  // Sincroniza classe dark no HTML sempre que o settings mudar
   useEffect(() => {
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
-  }, [settings.darkMode]);
+    // Salva em cache para o próximo reload ser instantâneo
+    localStorage.setItem('nexus_settings', JSON.stringify(settings));
+  }, [settings]);
 
   useEffect(() => {
     localStorage.setItem('nexus_view', currentView);
   }, [currentView]);
 
   const fetchAllData = useCallback(async () => {
-    setIsLoading(true);
     try {
       const { data: settingsData } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
-      if (settingsData) setSettings(settingsData);
+      if (settingsData) {
+        setSettings(settingsData);
+        localStorage.setItem('nexus_settings', JSON.stringify(settingsData));
+      }
 
       const { data: flowData } = await supabase.from('workflow_stages').select('*').order('id');
       if (flowData && flowData.length > 0) setWorkflow(flowData);
@@ -150,6 +160,7 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('nexus_user');
+    // Mantemos o settings em cache para que a tela de login respeite o tema
   };
 
   if (!currentUser) return <Login users={users} onLogin={handleLogin} settings={settings} onSystemInit={() => {}} />;

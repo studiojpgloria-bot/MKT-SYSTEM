@@ -58,7 +58,7 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings }) => {
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0e11] flex items-center justify-center p-4 transition-colors duration-300">
       <div className="bg-white dark:bg-[#151a21] w-full max-w-5xl rounded-[32px] shadow-2xl flex overflow-hidden border border-gray-200 dark:border-[#2a303c]">
         
-        <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-[#151a21]">
+        <div className="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-white dark:bg-[#151a21]">
            <div className="mb-10">
               <div className="mb-6 flex justify-between items-center">
                 {settings.companyLogo ? (
@@ -69,13 +69,13 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings }) => {
                   </div>
                 )}
               </div>
-              <h1 className="text-4xl font-black text-white mb-2 tracking-tight">{loginTitle}</h1>
-              <p className="text-gray-500 font-medium">{loginSubtitle}</p>
+              <h1 className="text-4xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">{loginTitle}</h1>
+              <p className="text-slate-500 dark:text-gray-400 font-medium">{loginSubtitle}</p>
            </div>
 
            <form onSubmit={handleLogin} className="space-y-6">
               <div>
-                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">E-mail</label>
+                 <label className="block text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-2 ml-1">E-mail</label>
                  <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-500 transition-colors">
                         <Mail size={20} />
@@ -85,14 +85,14 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings }) => {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 bg-[#0b0e11] border border-[#2a303c] text-white rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-700"
+                      className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-[#0b0e11] border border-gray-200 dark:border-[#2a303c] text-slate-900 dark:text-white rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-700"
                       placeholder="seu@email.com"
                     />
                  </div>
               </div>
 
               <div>
-                 <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Senha</label>
+                 <label className="block text-[10px] font-black text-slate-400 dark:text-gray-500 uppercase tracking-widest mb-2 ml-1">Senha</label>
                  <div className="relative group">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-indigo-500 transition-colors">
                         <Lock size={20} />
@@ -102,17 +102,17 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings }) => {
                       value={password}
                       required
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-12 pr-12 py-4 bg-[#0b0e11] border border-[#2a303c] text-white rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-700"
+                      className="w-full pl-12 pr-12 py-4 bg-gray-50 dark:bg-[#0b0e11] border border-gray-200 dark:border-[#2a303c] text-slate-900 dark:text-white rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-700"
                       placeholder="••••••••"
                     />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-indigo-500 transition-colors">
                       {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                     </button>
                  </div>
               </div>
 
               {error && (
-                <div className="flex items-center gap-3 text-red-400 text-sm bg-red-400/10 p-4 rounded-2xl border border-red-400/20 animate-in fade-in slide-in-from-top-2">
+                <div className="flex items-center gap-3 text-red-500 dark:text-red-400 text-sm bg-red-500/10 p-4 rounded-2xl border border-red-500/20 animate-in fade-in slide-in-from-top-2">
                    <AlertCircle size={20} />
                    <span className="font-bold">{error}</span>
                 </div>
@@ -124,16 +124,21 @@ export const Login: React.FC<LoginProps> = ({ users, onLogin, settings }) => {
            </form>
         </div>
 
-        <div className="hidden md:flex w-1/2 relative flex-col justify-end p-12 text-white overflow-hidden">
+        {/* Banner Section */}
+        <div className="hidden md:flex w-1/2 relative flex-col justify-end p-12 text-white overflow-hidden bg-slate-900">
            {settings?.loginScreen?.bannerUrl && (
-               <>
-                   <img src={settings.loginScreen.bannerUrl} className="absolute inset-0 w-full h-full object-cover" alt="Login Banner" />
-                   <div className="absolute inset-0 bg-indigo-950/40 mix-blend-multiply"></div>
-                   <div className="absolute inset-0 bg-gradient-to-t from-[#0b0e11] to-transparent"></div>
-               </>
+               <div className="absolute inset-0 w-full h-full">
+                   <img 
+                      src={settings.loginScreen.bannerUrl} 
+                      className="w-full h-full object-cover transition-transform duration-700 hover:scale-110" 
+                      alt="Login Banner" 
+                   />
+                   <div className="absolute inset-0 bg-black/30 mix-blend-multiply"></div>
+                   <div className="absolute inset-0 bg-gradient-to-t from-[#0b0e11] via-transparent to-transparent"></div>
+               </div>
            )}
-           <div className="relative z-10 flex items-center gap-2 text-white/60 text-[10px] font-black uppercase tracking-widest">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+           <div className="relative z-10 flex items-center gap-2 text-white/80 text-[10px] font-black uppercase tracking-widest bg-black/40 backdrop-blur-md px-4 py-2 rounded-full w-fit">
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.8)]"></div>
                 SERVIDOR ONLINE
            </div>
         </div>
