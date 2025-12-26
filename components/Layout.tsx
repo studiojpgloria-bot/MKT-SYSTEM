@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Moon, Sun, FileText, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Moon, Sun, FileText, ShieldCheck, RefreshCw, Loader2 } from 'lucide-react';
 import { User, UserRole, SystemSettings, Notification } from '../types';
 
 interface LayoutProps {
@@ -15,6 +15,8 @@ interface LayoutProps {
   notifications: Notification[];
   onNotificationClick: (notification: Notification) => void;
   onClearNotifications: () => void;
+  isSyncing?: boolean;
+  onSync?: () => void;
   children: React.ReactNode;
 }
 
@@ -30,6 +32,8 @@ export const Layout: React.FC<LayoutProps> = ({
   notifications,
   onNotificationClick,
   onClearNotifications,
+  isSyncing,
+  onSync,
   children 
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
@@ -46,7 +50,6 @@ export const Layout: React.FC<LayoutProps> = ({
   };
 
   const activeTheme = themeColors[settings.themeColor] || themeColors.indigo;
-
   const unreadCount = notifications.filter(n => !n.read).length;
 
   useEffect(() => {
@@ -84,11 +87,8 @@ export const Layout: React.FC<LayoutProps> = ({
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-[#0b0e11] text-gray-900 dark:text-white font-sans overflow-hidden transition-colors duration-300">
-      {/* Sidebar */}
       <aside
-        className={`${
-          isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-white dark:bg-[#0b0e11] border-r border-gray-200 dark:border-[#2a303c] transition-all duration-300 flex flex-col flex-shrink-0 relative z-20`}
+        className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-white dark:bg-[#0b0e11] border-r border-gray-200 dark:border-[#2a303c] transition-all duration-300 flex flex-col flex-shrink-0 relative z-20`}
       >
         <div className="h-20 flex items-center justify-between px-6">
           {isSidebarOpen && (
@@ -150,9 +150,7 @@ export const Layout: React.FC<LayoutProps> = ({
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-gray-50 dark:bg-[#0b0e11] transition-colors duration-300">
-        {/* Header */}
         <header className="h-20 flex items-center justify-between px-8 flex-shrink-0 bg-gray-50 dark:bg-[#0b0e11] border-b border-gray-100 dark:border-[#2a303c]/50 transition-colors duration-300">
             <div className="flex flex-col">
                 <h1 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
@@ -162,6 +160,15 @@ export const Layout: React.FC<LayoutProps> = ({
             </div>
 
             <div className="flex items-center gap-6">
+                <button 
+                  onClick={onSync}
+                  disabled={isSyncing}
+                  title="Sincronizar dados com o servidor"
+                  className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all disabled:opacity-50"
+                >
+                   {isSyncing ? <Loader2 size={18} className="animate-spin text-blue-500" /> : <RefreshCw size={18} />}
+                </button>
+
                 <button 
                   onClick={onToggleTheme}
                   className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-indigo-500 transition-all"

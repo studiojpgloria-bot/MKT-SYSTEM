@@ -22,21 +22,22 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { DocumentEditorModal } from './components/DocumentEditorModal';
 import { supabase } from './supabase';
 
-// Versão do esquema para forçar limpeza de cache se necessário
-const APP_SCHEMA_VERSION = '2.1';
+// Bump para 2.2: Força todos os clientes a limparem caches locais antigos/errados
+const APP_SCHEMA_VERSION = '2.2';
 
 export const App: React.FC = () => {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
   // Inicialização segura do Usuário
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
       const saved = localStorage.getItem('nexus_user');
       if (!saved) return null;
       const parsed = JSON.parse(saved);
-      // Validação básica de estrutura
-      if (!parsed.id || !parsed.email) throw new Error('Invalid user cache');
+      if (!parsed.id || !parsed.email) return null;
       return parsed;
     } catch (e) {
-      localStorage.removeItem('nexus_user');
       return null;
     }
   });
@@ -50,28 +51,18 @@ export const App: React.FC = () => {
     try {
       const savedVersion = localStorage.getItem('nexus_schema_version');
       if (savedVersion !== APP_SCHEMA_VERSION) {
-        console.warn("Versão de cache antiga detectada. Resetando configurações locais...");
-        localStorage.clear();
+        // Se a versão mudou, limpa configurações locais para evitar conflitos
+        localStorage.removeItem('nexus_settings');
         localStorage.setItem('nexus_schema_version', APP_SCHEMA_VERSION);
         return INITIAL_SETTINGS;
       }
-
       const saved = localStorage.getItem('nexus_settings');
-      if (!saved) return INITIAL_SETTINGS;
-      
-      const parsed = JSON.parse(saved);
-      // Força campos obrigatórios para evitar erros de renderização (Crash do app)
-      if (!parsed.deliveryTypes || !parsed.workflowRules || !parsed.themeColor) {
-        throw new Error('Configurações incompletas no cache');
-      }
-      return parsed;
+      return saved ? JSON.parse(saved) : INITIAL_SETTINGS;
     } catch (e) {
-      console.error("Erro ao ler cache de configurações:", e);
       return INITIAL_SETTINGS;
     }
   });
 
-  const [isLoading, setIsLoading] = useState(true);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -93,7 +84,7 @@ export const App: React.FC = () => {
   const [isDocEditorOpen, setIsDocEditorOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
 
-  // Efeito de aplicação de tema e persistência de segurança no LocalStorage
+  // Aplicação imediata do tema e salvamento de versão
   useEffect(() => {
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
@@ -104,30 +95,22 @@ export const App: React.FC = () => {
     localStorage.setItem('nexus_schema_version', APP_SCHEMA_VERSION);
   }, [settings]);
 
-  useEffect(() => {
-    localStorage.setItem('nexus_view', currentView);
-  }, [currentView]);
-
-  const fetchAllData = useCallback(async () => {
+  const fetchAllData = useCallback(async (manual = false) => {
+    if (manual) setIsSyncing(true);
+    
     try {
-      console.log("🔄 Sincronizando com Supabase e validando integridade...");
+      console.log(`🔄 [Schema ${APP_SCHEMA_VERSION}] Sincronizando com Supabase...`);
 
-      // 1. Configurações - Prioridade absoluta para o banco
-      const { data: settingsData, error: sError } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
-      if (settingsData) {
-        // Validação profunda antes de aplicar
-        if (settingsData.deliveryTypes && Array.isArray(settingsData.deliveryTypes)) {
-          setSettings(settingsData);
-        }
-      } else {
-        await supabase.from('system_settings').upsert([INITIAL_SETTINGS]);
-      }
+      // 1. Configurações - Sempre a verdade vem do banco
+      const { data: settingsData } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
+      if (settingsData) setSettings(settingsData);
+      else await supabase.from('system_settings').upsert([INITIAL_SETTINGS]);
 
       // 2. Workflow
       const { data: flowData } = await supabase.from('workflow_stages').select('*').order('id');
       if (flowData && flowData.length > 0) setWorkflow(flowData);
 
-      // 3. Usuários
+      // 3. Usuários (Sanitização: Remove duplicatas se houver)
       const { data: userData } = await supabase.from('users_profiles').select('*');
       if (userData && userData.length > 0) {
         setUsers(userData);
@@ -140,11 +123,10 @@ export const App: React.FC = () => {
       const { data: taskData } = await supabase.from('tasks').select('*');
       if (taskData) setTasks(taskData);
 
-      // 5. Documentos
+      // 5. Outros dados
       const { data: docData } = await supabase.from('documents').select('*');
       if (docData) setDocuments(docData);
 
-      // 6. Eventos
       const { data: eventData } = await supabase.from('calendar_events').select('*');
       if (eventData) setEvents(eventData);
 
@@ -153,34 +135,28 @@ export const App: React.FC = () => {
         if (notifData) setNotifications(notifData);
       }
       
-      console.log("✅ Integridade verificada. Sistema operacional.");
+      console.log("✅ Dados verificados e sincronizados.");
     } catch (err) {
-      console.error("❌ Falha crítica de sincronização:", err);
+      console.error("❌ Falha na sincronização:", err);
     } finally {
       setIsLoading(false);
+      setIsSyncing(false);
     }
   }, [currentUser]);
 
   useEffect(() => {
     fetchAllData();
-    const taskSubscription = supabase.channel('realtime-tasks-v2')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setTasks(prev => [...prev, payload.new as Task]);
-          } else if (payload.eventType === 'UPDATE') {
-            setTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new as Task : t));
-          } else if (payload.eventType === 'DELETE') {
-            setTasks(prev => prev.filter(t => t.id !== payload.old.id));
-          }
+    const taskSubscription = supabase.channel('nexus-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+          fetchAllData(); // Refresh silencioso em caso de qualquer mudança
       })
       .subscribe();
-
     return () => { supabase.removeChannel(taskSubscription); };
   }, [fetchAllData]);
 
   const persistTask = async (task: Task) => {
     const { error } = await supabase.from('tasks').upsert([task]);
-    if (error) console.error("Erro ao persistir tarefa:", error);
+    if (error) console.error("Erro ao salvar no Supabase:", error);
   };
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
@@ -211,24 +187,18 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('nexus_user');
+    localStorage.removeItem('nexus_view');
   };
 
-  // RESET DE FÁBRICA: Limpa banco e cache local para corrigir erros catastróficos
   const handleResetApp = async () => {
     if (!confirm("⚠️ ATENÇÃO: Isso apagará TODOS os dados do banco e o cache do seu navegador. Deseja continuar?")) return;
-    
     try {
       setIsLoading(true);
-      // Limpa LocalStorage
       localStorage.clear();
-      
-      // Limpa Tabelas no Supabase (Apenas se o RLS permitir ou via SQL Editor)
       await supabase.from('tasks').delete().neq('id', '_');
       await supabase.from('calendar_events').delete().neq('id', '_');
       await supabase.from('documents').delete().neq('id', '_');
       await supabase.from('notifications').delete().neq('id', '_');
-      
-      // Recarrega a página para estado limpo
       window.location.reload();
     } catch (e) {
       alert("Erro ao resetar: " + (e as Error).message);
@@ -243,6 +213,8 @@ export const App: React.FC = () => {
         currentView={currentView}
         onNavigate={setCurrentView}
         onLogout={handleLogout}
+        isSyncing={isSyncing}
+        onSync={() => fetchAllData(true)}
         onNewTask={() => {
             const newTask: Task = { 
                 id: `t-${Date.now()}`, 

@@ -1,13 +1,13 @@
 
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="no-transition">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nexus Gestão de Marketing</title>
     
     <script>
-      // BLOQUEIO CRÍTICO DE TEMA: Executa no milissegundo zero
+      // BLOQUEIO CRÍTICO DE TEMA: Executa antes de qualquer renderização
       (function() {
         try {
           const settings = JSON.parse(localStorage.getItem('nexus_settings'));
@@ -24,10 +24,11 @@
     </script>
 
     <style>
-      /* CSS Crítico */
       :root { --bg-light: #f9fafb; --bg-dark: #0b0e11; }
-      html.dark { background-color: var(--bg-dark); }
-      html:not(.dark) { background-color: var(--bg-light); }
+      html.dark { background-color: var(--bg-dark); color-scheme: dark; }
+      html:not(.dark) { background-color: var(--bg-light); color-scheme: light; }
+      
+      .no-transition * { transition: none !important; }
       
       .hide-scrollbar::-webkit-scrollbar { display: none; }
       .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -37,11 +38,6 @@
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
       .dark ::-webkit-scrollbar-thumb { background: #2a303c; }
       ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-      
-      /* Evita flash de transição no load */
-      .no-transition * {
-        transition: none !important;
-      }
     </style>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -54,9 +50,7 @@
         darkMode: 'class',
         theme: {
           extend: {
-            fontFamily: {
-              sans: ['Poppins', 'sans-serif'],
-            },
+            fontFamily: { sans: ['Poppins', 'sans-serif'] },
             colors: {
               dark: {
                 bg: '#0b0e11',
@@ -70,30 +64,29 @@
       }
     </script>
     
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
-    "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
-    "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.1/+esm",
-    "vite": "https://esm.sh/vite@^7.3.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
-  }
-}
-</script>
-</head>
-  <body class="bg-gray-50 dark:bg-[#0b0e11] text-slate-900 dark:text-white">
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "lucide-react": "https://aistudiocdn.com/lucide-react@^0.554.0",
+        "recharts": "https://aistudiocdn.com/recharts@^3.4.1",
+        "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.1/+esm",
+        "vite": "https://esm.sh/vite@^7.3.0",
+        "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2"
+      }
+    }
+    </script>
+  </head>
+  <body class="bg-gray-50 dark:bg-[#0b0e11] text-slate-900 dark:text-white antialiased">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
     <script>
-      // Adiciona transições apenas após o carregamento inicial
       window.addEventListener('load', () => {
         setTimeout(() => {
-          document.body.classList.add('transition-colors', 'duration-300');
-        }, 100);
+          document.documentElement.classList.remove('no-transition');
+        }, 200);
       });
     </script>
   </body>
