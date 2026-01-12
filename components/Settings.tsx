@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Save, User as UserIcon, Building, Palette, Shield, Plus, Trash2, GripVertical, Check, Layout, AlertTriangle, RefreshCw, Image as ImageIcon, Upload, Moon, Sun, ShieldCheck, Monitor, Lock, ChevronDown, Key, UserCircle, Globe, Briefcase } from 'lucide-react';
+import { Save, User as UserIcon, Building, Palette, Shield, Trash2, GripVertical, Layout, Image as ImageIcon, Sun, Moon, ShieldCheck, ChevronDown, Key, Eye, X, Briefcase } from 'lucide-react';
 import { SystemSettings, User, UserRole, WorkflowStage, Task, DeliveryType } from '../types';
 
 interface SettingsProps {
@@ -30,6 +30,13 @@ export const Settings: React.FC<SettingsProps> = ({
   const [localSettings, setLocalSettings] = useState<SystemSettings>(settings);
   const [localWorkflow, setLocalWorkflow] = useState<WorkflowStage[]>(workflow);
   const [newUser, setNewUser] = useState({ name: '', email: '', role: UserRole.MEMBER, password: '' });
+  
+  // User Edit State
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  
+  // Drag and Drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   
   const logoInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
@@ -87,6 +94,23 @@ export const Settings: React.FC<SettingsProps> = ({
     }
   };
 
+  const handleSaveUserChanges = () => {
+    if (editingUser) {
+        const updatedUsers = users.map(u => {
+            if (u.id === editingUser.id) {
+                return {
+                    ...u,
+                    password: newPassword ? newPassword : u.password
+                };
+            }
+            return u;
+        });
+        onUpdateUsers(updatedUsers);
+        setEditingUser(null);
+        setNewPassword('');
+    }
+  };
+
   const handleUpdateWorkflowStage = (id: string, name: string) => {
     setLocalWorkflow(prev => prev.map(s => s.id === id ? { ...s, name } : s));
   };
@@ -132,6 +156,35 @@ export const Settings: React.FC<SettingsProps> = ({
       ...prev,
       deliveryTypes: [...(prev.deliveryTypes || []), newType]
     }));
+  };
+
+  // Drag and Drop Handlers
+  const onDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const onDropWorkflow = (index: number) => {
+    if (draggedIndex === null) return;
+    const items = [...localWorkflow];
+    const draggedItem = items[draggedIndex];
+    items.splice(draggedIndex, 1);
+    items.splice(index, 0, draggedItem);
+    setLocalWorkflow(items);
+    setDraggedIndex(null);
+  };
+
+  const onDropDelivery = (index: number) => {
+    if (draggedIndex === null) return;
+    const items = [...(localSettings.deliveryTypes || [])];
+    const draggedItem = items[draggedIndex];
+    items.splice(draggedIndex, 1);
+    items.splice(index, 0, draggedItem);
+    setLocalSettings({ ...localSettings, deliveryTypes: items });
+    setDraggedIndex(null);
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,41 +337,71 @@ export const Settings: React.FC<SettingsProps> = ({
             {activeTab === 'team' && (
                 <div className="space-y-12 animate-in fade-in duration-300 flex flex-col">
                     <h3 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Gestão da Equipe</h3>
-                    <div className="bg-slate-50 dark:bg-[#0b0e11] p-10 rounded-[40px] border border-slate-200 dark:border-[#2a303c] space-y-8 relative overflow-hidden group">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
+                    
+                    {/* ADD MEMBER FORM */}
+                    <div className="bg-[#151a21] p-8 rounded-[32px] border border-[#2a303c] space-y-8 shadow-xl">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label className="text-[10px] font-black text-slate-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Nome</label>
-                                <input type="text" placeholder="Ex: João Paulo" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className={`w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-slate-900 dark:text-white outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block ml-1">Nome</label>
+                                <div className="relative">
+                                    <input 
+                                        type="text" 
+                                        placeholder="Ex: João Paulo" 
+                                        value={newUser.name} 
+                                        onChange={e => setNewUser({...newUser, name: e.target.value})} 
+                                        className="w-full p-4 bg-[#0b0e11] border border-[#2a303c] rounded-2xl text-white outline-none font-medium focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-gray-700" 
+                                    />
+                                </div>
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Email</label>
-                                <input type="email" placeholder="Ex: joao@nexus.com" value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} className={`w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-slate-900 dark:text-white outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block ml-1">Email</label>
+                                <input 
+                                    type="email" 
+                                    placeholder="Ex: joao@nexus.com" 
+                                    value={newUser.email} 
+                                    onChange={e => setNewUser({...newUser, email: e.target.value})} 
+                                    className="w-full p-4 bg-[#0b0e11] border border-[#2a303c] rounded-2xl text-white outline-none font-medium focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-gray-700" 
+                                />
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Senha Inicial</label>
-                                <input type="password" placeholder="••••••••" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className={`w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-slate-900 dark:text-white outline-none font-bold focus:ring-1 ${activeTheme.ring}`} />
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block ml-1">Senha Inicial</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="••••••••" 
+                                    value={newUser.password} 
+                                    onChange={e => setNewUser({...newUser, password: e.target.value})} 
+                                    className="w-full p-4 bg-[#0b0e11] border border-[#2a303c] rounded-2xl text-white outline-none font-medium focus:ring-2 focus:ring-indigo-500/50 transition-all placeholder:text-gray-700" 
+                                />
                             </div>
                             <div>
-                                <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 block">Função</label>
-                                <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})} className={`w-full p-5 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-slate-900 dark:text-white outline-none font-bold appearance-none focus:ring-1 ${activeTheme.ring}`}>
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 block ml-1">Função</label>
+                                <select 
+                                    value={newUser.role} 
+                                    onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})} 
+                                    className="w-full p-4 bg-[#0b0e11] border border-[#2a303c] rounded-2xl text-white outline-none font-medium appearance-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+                                >
                                     <option value={UserRole.MEMBER}>Membro</option>
                                     <option value={UserRole.MANAGER}>Gestor</option>
                                     <option value={UserRole.ADMIN}>Administrador</option>
                                 </select>
                             </div>
                         </div>
-                        <button onClick={handleAddUser} className={`w-full py-5 ${activeTheme.bg} text-white font-black rounded-2xl shadow-xl ${activeTheme.shadow} text-xs uppercase tracking-widest transition-all`}>
-                            ADICIONAR MEMBRO
+                        <button 
+                            onClick={handleAddUser} 
+                            className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-600/20 text-xs uppercase tracking-[0.2em] hover:bg-indigo-500 transition-all active:scale-[0.98]"
+                        >
+                            Adicionar Membro
                         </button>
                     </div>
 
+                    {/* TEAM LIST */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {users.map(u => (
-                            <div key={u.id} className={`p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] flex items-center gap-5 group relative hover:border-indigo-500/50 transition-all shadow-sm rounded-[32px]`}>
-                                <img src={u.avatar} className="w-16 h-16 rounded-full object-cover border-4 border-white dark:border-[#151a21] shadow-sm" alt={u.name} />
-                                <div className="flex-1 truncate">
-                                    <p className="font-black text-lg text-slate-900 dark:text-white truncate leading-tight">{u.name}</p>
-                                    <div className="flex items-center gap-2 mt-1">
+                            <div key={u.id} className="p-6 bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] flex items-center gap-5 relative rounded-[32px] group hover:border-indigo-500/30 transition-all">
+                                <img src={u.avatar} className="w-14 h-14 rounded-full object-cover border-4 border-white dark:border-[#0b0e11] shadow-sm" alt={u.name} />
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-base text-slate-900 dark:text-white truncate">{u.name}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
                                         <select 
                                             value={u.role}
                                             onChange={(e) => handleUpdateUserRole(u.id, e.target.value as UserRole)}
@@ -330,9 +413,71 @@ export const Settings: React.FC<SettingsProps> = ({
                                         </select>
                                     </div>
                                 </div>
-                                <button onClick={() => handleRemoveUser(u.id)} className="p-3 text-slate-400 dark:text-gray-600 opacity-100 hover:text-red-500 transition-all absolute top-2 right-2"><Trash2 size={16} /></button>
+                                
+                                <div className="flex flex-col gap-2">
+                                    <button 
+                                        onClick={() => handleRemoveUser(u.id)} 
+                                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-all"
+                                        title="Remover"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                    <button 
+                                        onClick={() => setEditingUser(u)} 
+                                        className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded-xl transition-all"
+                                        title="Ver Detalhes / Alterar Senha"
+                                    >
+                                        <Eye size={16} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT USER MODAL */}
+            {editingUser && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-[#151a21] w-full max-w-md rounded-[32px] shadow-2xl border border-gray-200 dark:border-[#2a303c] overflow-hidden">
+                        <div className="p-6 border-b border-gray-100 dark:border-[#2a303c] flex justify-between items-center bg-gray-50 dark:bg-[#0b0e11]">
+                            <h3 className="text-lg font-bold text-gray-900 dark:text-white">Detalhes do Usuário</h3>
+                            <button onClick={() => setEditingUser(null)} className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div className="flex items-center gap-4 mb-6">
+                                <img src={editingUser.avatar} className="w-16 h-16 rounded-full border-4 border-white dark:border-[#2a303c]" alt={editingUser.name} />
+                                <div>
+                                    <p className="font-bold text-lg text-gray-900 dark:text-white">{editingUser.name}</p>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">{editingUser.email}</p>
+                                    <span className="inline-block mt-1 text-[10px] font-black uppercase tracking-widest bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded">{editingUser.role}</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-2 block">Redefinir Senha</label>
+                                <div className="relative">
+                                    <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Nova senha..." 
+                                        value={newPassword} 
+                                        onChange={(e) => setNewPassword(e.target.value)} 
+                                        className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-[#0b0e11] border border-gray-200 dark:border-[#2a303c] rounded-2xl text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-gray-500" 
+                                    />
+                                </div>
+                                <p className="text-[10px] text-gray-400 mt-2 ml-1">Deixe em branco para manter a senha atual.</p>
+                            </div>
+
+                            <button 
+                                onClick={handleSaveUserChanges} 
+                                className="w-full py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-xl shadow-indigo-600/20 text-xs uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all"
+                            >
+                                Salvar Alterações
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -354,9 +499,16 @@ export const Settings: React.FC<SettingsProps> = ({
                   <div className="pt-10 border-t border-slate-200 dark:border-[#2a303c]">
                     <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-6 tracking-tight">Etapas do Workflow</h3>
                     <div className="space-y-3 max-w-2xl">
-                       {localWorkflow.map((stage) => (
-                           <div key={stage.id} className="flex items-center gap-4 p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-[24px] group hover:border-indigo-500/30 transition-all shadow-sm">
-                               <GripVertical size={18} className="text-slate-400 dark:text-gray-600 shrink-0" />
+                       {localWorkflow.map((stage, index) => (
+                           <div 
+                              key={stage.id} 
+                              draggable
+                              onDragStart={() => onDragStart(index)}
+                              onDragOver={onDragOver}
+                              onDrop={() => onDropWorkflow(index)}
+                              className={`flex items-center gap-4 p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-[24px] group hover:border-indigo-500/30 transition-all shadow-sm ${draggedIndex === index ? 'opacity-40 grayscale' : 'opacity-100'}`}
+                           >
+                               <GripVertical size={18} className="text-slate-400 dark:text-gray-600 shrink-0 cursor-move" />
                                <input 
                                   value={stage.name} 
                                   onChange={(e) => handleUpdateWorkflowStage(stage.id, e.target.value)}
@@ -388,9 +540,16 @@ export const Settings: React.FC<SettingsProps> = ({
                 </div>
                 
                 <div className="space-y-3 max-w-2xl">
-                  {localSettings.deliveryTypes?.map((type) => (
-                    <div key={type.id} className="flex items-center gap-4 p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-[24px] group hover:border-indigo-500/30 transition-all shadow-sm">
-                      <GripVertical size={18} className="text-slate-400 dark:text-gray-600 shrink-0" />
+                  {localSettings.deliveryTypes?.map((type, index) => (
+                    <div 
+                      key={type.id} 
+                      draggable
+                      onDragStart={() => onDragStart(index)}
+                      onDragOver={onDragOver}
+                      onDrop={() => onDropDelivery(index)}
+                      className={`flex items-center gap-4 p-6 bg-slate-50 dark:bg-[#0b0e11] border border-slate-200 dark:border-[#2a303c] rounded-[24px] group hover:border-indigo-500/30 transition-all shadow-sm ${draggedIndex === index ? 'opacity-40 grayscale' : 'opacity-100'}`}
+                    >
+                      <GripVertical size={18} className="text-slate-400 dark:text-gray-600 shrink-0 cursor-move" />
                       <input 
                         value={type.name} 
                         onChange={(e) => handleUpdateDeliveryType(type.id, e.target.value)}
@@ -508,7 +667,6 @@ export const Settings: React.FC<SettingsProps> = ({
                             </div>
                             <div className="flex flex-col gap-4">
                                 <button onClick={onResetApp} className="w-full py-4 bg-white dark:bg-[#0b0e11] text-red-600 border border-red-200 dark:border-red-900/30 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all shadow-sm">Limpar Banco de Dados</button>
-                                <button className="w-full py-4 bg-slate-200 dark:bg-white/5 text-slate-400 dark:text-gray-600 rounded-2xl text-xs font-black uppercase tracking-widest cursor-not-allowed">Exportar Todos os Dados (Em breve)</button>
                             </div>
                         </div>
                     </div>

@@ -8,22 +8,22 @@ export const MOCK_USERS: User[] = [
     role: UserRole.ADMIN,
     email: 'studiojpgloria@gmail.com',
     password: 'password',
-    avatar: 'https://ui-avatars.com/api/?name=JP+Gloria&background=6366f1&color=fff',
+    avatar: 'https://ui-avatars.com/api/?name=JP+Gloria&background=7c3aed&color=fff',
     status: 'online',
     lastSeen: Date.now()
   }
 ];
 
 export const INITIAL_TASKS: Task[] = [];
-
 export const INITIAL_EVENTS: CalendarEvent[] = [];
+export const INITIAL_DOCUMENTS: Document[] = [];
 
 export const INITIAL_SETTINGS: SystemSettings = {
-    id: 'global-config', // ID estável para persistência única no Supabase
-    companyName: 'Nexus Marketing',
-    companyLogo: '',
-    themeColor: 'indigo',
-    darkMode: false,
+    id: 'global-config',
+    companyName: 'MZ MARKETING',
+    companyLogo: '', // Agora definido via upload nas configurações
+    themeColor: 'violet',
+    darkMode: true,
     notifications: {
         email: true,
         push: true,
@@ -34,9 +34,9 @@ export const INITIAL_SETTINGS: SystemSettings = {
         sessionTimeout: 60
     },
     loginScreen: {
-        title: 'Nexus Gestão',
-        subtitle: 'Acesse o painel administrativo.',
-        bannerUrl: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&auto=format&fit=crop&w=1567&q=80'
+        title: 'MZ MARKETING',
+        subtitle: 'Acesse o painel',
+        bannerUrl: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80'
     },
     workflowRules: {
         onAccept: 'design',
@@ -45,12 +45,10 @@ export const INITIAL_SETTINGS: SystemSettings = {
         onReject: 'changes'
     },
     deliveryTypes: [
-      { id: 'social-media', name: 'Social Media (Post/Story)' },
+      { id: 'social-media', name: 'Social Media' },
       { id: 'video', name: 'Edição de Vídeo' },
       { id: 'design', name: 'Design Gráfico' },
-      { id: 'ads', name: 'Anúncios / Tráfego' },
-      { id: 'copy', name: 'Redação / Copy' }
+      { id: 'ads', name: 'Tráfego Pago' },
+      { id: 'copy', name: 'Copywriting' }
     ]
 };
-
-export const INITIAL_DOCUMENTS: Document[] = [];
