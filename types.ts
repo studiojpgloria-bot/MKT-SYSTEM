@@ -143,11 +143,8 @@ export interface CalendarEvent {
   meetingLink?: string;
   taskId?: string;
   attendeeIds?: string[];
-<<<<<<< HEAD
   completed?: boolean;
   completedAt?: number;
-=======
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
 }
 
 export interface DashboardMetrics {

@@ -15,7 +15,6 @@ interface LayoutProps {
   notifications: Notification[];
   onNotificationClick: (notification: Notification) => void;
   onClearNotifications: () => void;
-<<<<<<< HEAD
   connectionStatus?: 'connecting' | 'connected' | 'error';
   children: React.ReactNode;
 }
@@ -28,47 +27,23 @@ export const Layout: React.FC<LayoutProps> = ({
   onNewTask,
   onOpenProfile,
   settings,
-=======
-  isSyncing?: boolean;
-  onSync?: () => void;
-  children: React.ReactNode;
-}
-
-export const Layout: React.FC<LayoutProps> = ({ 
-  currentUser, 
-  currentView, 
-  onNavigate, 
-  onLogout, 
-  onNewTask, 
-  onOpenProfile,
-  settings, 
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
   onToggleTheme,
   notifications,
   onNotificationClick,
   onClearNotifications,
-<<<<<<< HEAD
   connectionStatus = 'connected',
   children
-=======
-  isSyncing,
-  onSync,
-  children 
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
 }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
-<<<<<<< HEAD
   const connectionColors = {
     connecting: 'bg-amber-500',
     connected: 'bg-emerald-500',
     error: 'bg-red-500'
   };
 
-=======
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
   const themeColors: any = {
     indigo: { text: 'text-indigo-600', bg: 'bg-indigo-600', border: 'border-indigo-600', shadow: 'shadow-indigo-500/20', hover: 'hover:bg-indigo-700', fill: 'fill-indigo-600' },
     emerald: { text: 'text-emerald-600', bg: 'bg-emerald-600', border: 'border-emerald-600', shadow: 'shadow-emerald-500/20', hover: 'hover:bg-emerald-700', fill: 'fill-emerald-600' },
@@ -102,7 +77,6 @@ export const Layout: React.FC<LayoutProps> = ({
   ];
 
   const getViewTitle = (view: string) => {
-<<<<<<< HEAD
     switch (view) {
       case 'dashboard': return `Olá, ${currentUser.name.split(' ')[0]}! 👋`;
       case 'crm': return 'CRM Kanban';
@@ -113,18 +87,6 @@ export const Layout: React.FC<LayoutProps> = ({
       case 'settings': return 'Configurações do Sistema';
       default: return view.charAt(0).toUpperCase() + view.slice(1);
     }
-=======
-      switch(view) {
-          case 'dashboard': return `Olá, ${currentUser.name.split(' ')[0]}! 👋`;
-          case 'crm': return 'CRM Kanban';
-          case 'calendar': return 'Calendário';
-          case 'documents': return 'Documentos & Atas';
-          case 'approvals': return 'Central de Aprovações';
-          case 'reports': return 'Relatórios de Performance';
-          case 'settings': return 'Configurações do Sistema';
-          default: return view.charAt(0).toUpperCase() + view.slice(1);
-      }
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
   };
 
   return (
@@ -135,7 +97,6 @@ export const Layout: React.FC<LayoutProps> = ({
         <div className="h-20 flex items-center justify-between px-6">
           {isSidebarOpen && (
             <div className="flex items-center gap-3">
-<<<<<<< HEAD
               {settings.companyLogo ? (
                 <img src={settings.companyLogo} alt="Logo" className="w-9 h-9 rounded-xl object-contain" />
               ) : (
@@ -144,16 +105,6 @@ export const Layout: React.FC<LayoutProps> = ({
                 </div>
               )}
               <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white truncate">{settings.companyName}</span>
-=======
-               {settings.companyLogo ? (
-                 <img src={settings.companyLogo} alt="Logo" className="w-9 h-9 rounded-xl object-contain" />
-               ) : (
-                 <div className={`w-9 h-9 rounded-xl ${activeTheme.bg} flex items-center justify-center shadow-lg ${activeTheme.shadow}`}>
-                    <ShieldCheck size={20} className="text-white" />
-                 </div>
-               )}
-               <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white truncate">{settings.companyName}</span>
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
             </div>
           )}
           <button
@@ -171,18 +122,10 @@ export const Layout: React.FC<LayoutProps> = ({
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-<<<<<<< HEAD
                 className={`flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-200 group ${currentView === item.id
                   ? `bg-gray-100 dark:bg-[#151a21] text-gray-900 dark:text-white`
                   : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#151a21]/50'
                   }`}
-=======
-                className={`flex items-center gap-4 p-3.5 rounded-2xl transition-all duration-200 group ${
-                  currentView === item.id 
-                    ? `bg-gray-100 dark:bg-[#151a21] text-gray-900 dark:text-white` 
-                    : 'text-gray-500 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-[#151a21]/50'
-                }`}
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
               >
                 <item.icon size={20} className={`${currentView === item.id ? activeTheme.text : 'text-gray-500 group-hover:text-gray-400 dark:group-hover:text-gray-300'}`} />
                 {isSidebarOpen && <span className="font-medium text-sm">{item.label}</span>}
@@ -192,7 +135,6 @@ export const Layout: React.FC<LayoutProps> = ({
 
         <div className="p-6">
           {isSidebarOpen ? (
-<<<<<<< HEAD
             <div className="bg-gray-50 dark:bg-[#151a21] rounded-3xl p-4 flex items-center gap-3 border border-gray-200 dark:border-[#2a303c]/50">
               <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11] cursor-pointer" onClick={onOpenProfile} />
               <div className="flex-1 min-w-0">
@@ -207,29 +149,12 @@ export const Layout: React.FC<LayoutProps> = ({
             <div className="flex justify-center">
               <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11] cursor-pointer" onClick={onOpenProfile} />
             </div>
-=======
-             <div className="bg-gray-50 dark:bg-[#151a21] rounded-3xl p-4 flex items-center gap-3 border border-gray-200 dark:border-[#2a303c]/50">
-                <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11] cursor-pointer" onClick={onOpenProfile} />
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{currentUser.name}</p>
-                    <p className={`text-[10px] ${activeTheme.text} font-bold uppercase`}>{currentUser.role.toLowerCase()}</p>
-                </div>
-                <button onClick={onLogout} className="text-gray-400 hover:text-red-500 transition-colors" title="Sair">
-                    <LogOut size={16} />
-                </button>
-             </div>
-          ) : (
-             <div className="flex justify-center">
-                 <img src={currentUser.avatar} alt="Profile" className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11] cursor-pointer" onClick={onOpenProfile} />
-             </div>
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
           )}
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative bg-gray-50 dark:bg-[#0b0e11] transition-colors duration-300">
         <header className="h-20 flex items-center justify-between px-8 flex-shrink-0 bg-gray-50 dark:bg-[#0b0e11] border-b border-gray-100 dark:border-[#2a303c]/50 transition-colors duration-300">
-<<<<<<< HEAD
           <div className="flex flex-col">
             <h1 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
               {getViewTitle(currentView)}
@@ -303,87 +228,6 @@ export const Layout: React.FC<LayoutProps> = ({
 
         <div className="flex-1 overflow-auto p-8 pt-4 custom-scrollbar">
           {children}
-=======
-            <div className="flex flex-col">
-                <h1 className="text-2xl font-black text-gray-900 dark:text-white flex items-center gap-2">
-                    {getViewTitle(currentView)}
-                </h1>
-                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{currentUser.role} Access</p>
-            </div>
-
-            <div className="flex items-center gap-6">
-                <button 
-                  onClick={onSync}
-                  disabled={isSyncing}
-                  title="Sincronizar dados com o servidor"
-                  className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-blue-500 transition-all disabled:opacity-50"
-                >
-                   {isSyncing ? <Loader2 size={18} className="animate-spin text-blue-500" /> : <RefreshCw size={18} />}
-                </button>
-
-                <button 
-                  onClick={onToggleTheme}
-                  className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 hover:text-indigo-500 transition-all"
-                >
-                   {settings.darkMode ? <Sun size={18} /> : <Moon size={18} />}
-                </button>
-
-                <div className="relative" ref={notifRef}>
-                    <button 
-                      className="w-10 h-10 rounded-full bg-white dark:bg-[#151a21] border border-gray-200 dark:border-[#2a303c] flex items-center justify-center text-gray-400 transition-all relative group"
-                      onClick={() => setIsNotifOpen(!isNotifOpen)}
-                    >
-                        <Bell size={18} className={`group-hover:${activeTheme.text}`} />
-                        {unreadCount > 0 && (
-                            <span className={`absolute top-1 right-1 w-2.5 h-2.5 ${activeTheme.bg} rounded-full border-2 border-white dark:border-[#0b0e11]`}></span>
-                        )}
-                    </button>
-
-                    {isNotifOpen && (
-                      <div className="absolute right-0 top-14 w-80 bg-white dark:bg-[#151a21] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#2a303c] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                         <div className="p-4 border-b border-gray-200 dark:border-[#2a303c] flex items-center justify-between bg-gray-50 dark:bg-[#0b0e11]">
-                            <h3 className="font-bold text-gray-900 dark:text-white text-sm">Notificações</h3>
-                            <button onClick={onClearNotifications} className={`text-[10px] font-black uppercase ${activeTheme.text}`}>Limpar</button>
-                         </div>
-                         <div className="max-h-80 overflow-y-auto custom-scrollbar">
-                            {notifications.length === 0 ? (
-                                <div className="p-8 text-center text-gray-500 text-xs">Sem notificações recentes</div>
-                            ) : (
-                                notifications.map(n => (
-                                  <div 
-                                    key={n.id} 
-                                    onClick={() => { onNotificationClick(n); setIsNotifOpen(false); }}
-                                    className={`p-4 border-b border-gray-100 dark:border-[#2a303c] hover:bg-gray-50 dark:hover:bg-[#1e232d] cursor-pointer transition-colors ${!n.read ? `bg-${settings.themeColor}-500/5` : ''}`}
-                                  >
-                                      <div className="flex justify-between items-start mb-1">
-                                          <span className={`text-[10px] font-black uppercase ${n.type === 'error' ? 'text-red-500' : n.type === 'warning' ? 'text-amber-500' : activeTheme.text}`}>
-                                            {n.title}
-                                          </span>
-                                          <span className="text-[10px] text-gray-500 font-bold">{new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                      </div>
-                                      <p className="text-xs text-gray-700 dark:text-gray-400 font-medium leading-relaxed">{n.message}</p>
-                                  </div>
-                                ))
-                            )}
-                         </div>
-                      </div>
-                    )}
-                </div>
-
-                <div className="h-8 w-px bg-gray-200 dark:bg-[#2a303c]"></div>
-
-                <button 
-                    onClick={onNewTask}
-                    className={`${activeTheme.bg} ${activeTheme.hover} text-white px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg ${activeTheme.shadow} active:scale-95`}
-                >
-                    + Nova Tarefa
-                </button>
-            </div>
-        </header>
-
-        <div className="flex-1 overflow-auto p-8 pt-4 custom-scrollbar">
-            {children}
->>>>>>> fe06aaa8afaf67824d6d0840f5dbca71c1cfdce6
         </div>
       </main>
     </div>

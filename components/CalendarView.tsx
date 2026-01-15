@@ -1,6 +1,5 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-<<<<<<< HEAD
 import { ChevronLeft, ChevronRight, ChevronDown, Calendar as CalendarIcon, Clock, Video, Link as LinkIcon, MapPin, Plus, ExternalLink, Trash2, X, MoreVertical, UserPlus, Users, Link2, Repeat, Check, Edit2, Target, Bell, CheckCircle } from 'lucide-react';
 import { CalendarEvent, User, SystemSettings } from '../types';
 
@@ -565,7 +564,7 @@ interface CalendarViewProps {
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAddEvent, onUpdateEvent, onDeleteEvent, onViewTask, themeColor, settings }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  
+
   const themeColors: any = {
     indigo: { text: 'text-indigo-600', bg: 'bg-indigo-600', border: 'border-indigo-600', shadow: 'shadow-indigo-500/20', hover: 'hover:bg-indigo-700', accent: 'text-indigo-400', accentBg: 'bg-indigo-500/10' },
     emerald: { text: 'text-emerald-600', bg: 'bg-emerald-600', border: 'border-emerald-600', shadow: 'shadow-emerald-500/20', hover: 'hover:bg-emerald-700', accent: 'text-emerald-400', accentBg: 'bg-emerald-500/10' },
@@ -582,7 +581,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newEventDate, setNewEventDate] = useState<Date | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
-  
+
   // New Event Form State
   const [newEventTitle, setNewEventTitle] = useState('');
   const [newEventType, setNewEventType] = useState<'meeting' | 'deadline' | 'campaign'>('meeting');
@@ -590,7 +589,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
   const [newEventLink, setNewEventLink] = useState('');
   const [newEventDesc, setNewEventDesc] = useState('');
   const [selectedAttendees, setSelectedAttendees] = useState<string[]>([]);
-  
+
   // New Time & Recurrence State
   const [isAllDay, setIsAllDay] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
@@ -599,14 +598,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
 
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
-  
+
   const monthName = currentDate.toLocaleString('pt-BR', { month: 'long' });
   const year = currentDate.getFullYear();
 
   // --- Navigation Handlers ---
   const prevMonth = () => setCurrentDate(new Date(year, currentDate.getMonth() - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, currentDate.getMonth() + 1, 1));
-  
+
   const upcomingEvents = useMemo(() => {
       return [...events].sort((a, b) => a.start - b.start).slice(0, 5);
   }, [events]);
@@ -628,7 +627,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
   };
 
   const toggleAttendee = (userId: string) => {
-      setSelectedAttendees(prev => 
+      setSelectedAttendees(prev =>
           prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
       );
   };
@@ -643,13 +642,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
       setSelectedAttendees(event.attendeeIds || []);
       setIsAllDay(!!event.allDay);
       setIsRecurring(!!event.recurring);
-      
+
       const start = new Date(event.start);
       const end = new Date(event.end);
       setStartTime(`${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`);
       setEndTime(`${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`);
       setNewEventDate(new Date(event.start));
-      
+
       setSelectedEvent(null);
       setIsCreateOpen(true);
   };
@@ -670,7 +669,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
           title: newEventTitle,
           description: newEventDesc,
           start: start.getTime(),
-          end: end.getTime(), 
+          end: end.getTime(),
           allDay: isAllDay,
           recurring: isRecurring,
           type: newEventType,
@@ -694,7 +693,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
   const renderDays = () => {
     const days = [];
     const prevMonthLastDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 0).getDate();
-    
+
     // Empty boxes for previous month days
     for (let i = (firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1); i > 0; i--) {
       const dayNum = prevMonthLastDay - i + 1;
@@ -708,21 +707,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = new Date(year, currentDate.getMonth(), d).setHours(0,0,0,0);
       const isToday = d === new Date().getDate() && currentDate.getMonth() === new Date().getMonth() && year === new Date().getFullYear();
-      
+
       const dayEvents = events.filter(e => new Date(e.start).setHours(0,0,0,0) === dateStr);
       const hasEvents = dayEvents.length > 0;
 
       days.push(
-        <div 
-          key={d} 
+        <div
+          key={d}
           onClick={() => handleDayClick(d)}
           className={`aspect-square p-2 rounded-2xl transition-all cursor-pointer relative m-1 flex flex-col items-center justify-center group ${
-            isToday ? `${activeTheme.bg} text-white shadow-xl ${activeTheme.shadow}` : 
+            isToday ? `${activeTheme.bg} text-white shadow-xl ${activeTheme.shadow}` :
             hasEvents ? 'bg-slate-100 dark:bg-[#1e2235] hover:bg-slate-200 dark:hover:bg-[#282c45]' : 'bg-slate-50 dark:bg-[#1e2235] hover:bg-slate-100 dark:hover:bg-[#282c45]'
           }`}
         >
           <span className={`text-xl font-bold ${hasEvents && !isToday ? 'text-gray-900 dark:text-white' : isToday ? 'text-white' : 'text-gray-400'}`}>{d}</span>
-          
+
           {hasEvents && (
             <div className="mt-2 flex -space-x-1.5 overflow-hidden">
               {dayEvents.flatMap(e => e.attendeeIds || []).slice(0, 3).map((uid, idx) => {
@@ -746,7 +745,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
 
   return (
     <div className="h-full flex flex-col lg:flex-row bg-white dark:bg-[#151a21] rounded-[40px] shadow-2xl overflow-hidden border border-gray-100 dark:border-[#2a303c]/30 transition-colors">
-      
+
       {/* Calendar Grid Area */}
       <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between mb-10">
@@ -799,7 +798,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                           <button className="text-gray-400 hover:text-gray-900 dark:hover:text-white"><MoreVertical size={16}/></button>
                       </div>
                       <h4 className="text-lg font-black text-gray-900 dark:text-white mb-4 leading-tight">{event.title}</h4>
-                      
+
                       <div className="flex items-center gap-6 mb-4">
                           <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
                               <Clock size={14} className={activeTheme.text} />
@@ -820,7 +819,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
       {isCreateOpen && newEventDate && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-6 animate-in fade-in duration-300">
               <div className="bg-white dark:bg-[#151a21] w-full max-w-5xl rounded-[40px] shadow-2xl border border-gray-200 dark:border-white/5 overflow-hidden flex flex-col md:flex-row h-[85vh] md:h-[780px] relative">
-                  
+
                   {/* Left Panel: Form Content */}
                   <div className="flex-[1.6] p-10 overflow-y-auto custom-scrollbar space-y-8 bg-white dark:bg-[#151a21]">
                       <div>
@@ -831,14 +830,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                       <div className="space-y-6">
                           <div>
                               <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 block">Título do Evento</label>
-                              <input 
-                                type="text" 
+                              <input
+                                type="text"
                                 autoFocus
                                 required
                                 value={newEventTitle}
                                 onChange={(e) => setNewEventTitle(e.target.value)}
                                 className="w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-3xl focus:ring-1 focus:ring-indigo-500 outline-none font-bold placeholder:text-gray-300 dark:placeholder:text-gray-800"
-                                placeholder="ex: Revisão Criativa" 
+                                placeholder="ex: Revisão Criativa"
                               />
                           </div>
 
@@ -846,7 +845,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                               <div>
                                   <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 block">Tipo</label>
                                   <div className="relative">
-                                      <select 
+                                      <select
                                         value={newEventType}
                                         onChange={(e) => setNewEventType(e.target.value as any)}
                                         className="w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-3xl font-bold outline-none appearance-none"
@@ -861,7 +860,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                               <div>
                                   <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 block">Plataforma (Opcional)</label>
                                   <div className="relative">
-                                      <select 
+                                      <select
                                         value={newEventPlatform}
                                         onChange={(e) => setNewEventPlatform(e.target.value as any)}
                                         className="w-full p-5 bg-slate-50 dark:bg-[#0b0e11] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-3xl font-bold outline-none appearance-none"
@@ -878,14 +877,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                           {/* Time & Options Area */}
                           <div className="bg-slate-50 dark:bg-[#151a2e]/50 p-6 rounded-3xl border border-gray-200 dark:border-white/5 space-y-6">
                               <div className="flex flex-wrap items-center gap-6">
-                                  <button 
+                                  <button
                                     type="button"
                                     onClick={() => setIsAllDay(!isAllDay)}
                                     className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isAllDay ? `${activeTheme.bg} text-white shadow-lg ${activeTheme.shadow}` : 'bg-white dark:bg-[#0b0e11] text-gray-500 border border-gray-200 dark:border-white/5'}`}
                                   >
                                       {isAllDay && <Check size={14}/>} Dia Todo
                                   </button>
-                                  <button 
+                                  <button
                                     type="button"
                                     onClick={() => setIsRecurring(!isRecurring)}
                                     className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${isRecurring ? 'bg-pink-600 text-white shadow-lg shadow-pink-500/20' : 'bg-white dark:bg-[#0b0e11] text-gray-500 border border-gray-200 dark:border-white/5'}`}
@@ -898,20 +897,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                                   <div className="grid grid-cols-2 gap-6 animate-in fade-in slide-in-from-top-2">
                                       <div>
                                           <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase mb-2 block">Início</label>
-                                          <input 
-                                            type="time" 
+                                          <input
+                                            type="time"
                                             value={startTime}
                                             onChange={(e) => setStartTime(e.target.value)}
-                                            className="w-full p-4 bg-white dark:bg-[#0b0e11] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-2xl font-mono text-sm outline-none focus:ring-1 focus:ring-indigo-500" 
+                                            className="w-full p-4 bg-white dark:bg-[#0b0e11] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-2xl font-mono text-sm outline-none focus:ring-1 focus:ring-indigo-500"
                                           />
                                       </div>
                                       <div>
                                           <label className="text-[10px] font-black text-gray-400 dark:text-gray-600 uppercase mb-2 block">Fim</label>
-                                          <input 
-                                            type="time" 
+                                          <input
+                                            type="time"
                                             value={endTime}
                                             onChange={(e) => setEndTime(e.target.value)}
-                                            className="w-full p-4 bg-white dark:bg-[#0b0e11] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-2xl font-mono text-sm outline-none focus:ring-1 focus:ring-indigo-500" 
+                                            className="w-full p-4 bg-white dark:bg-[#0b0e11] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-2xl font-mono text-sm outline-none focus:ring-1 focus:ring-indigo-500"
                                           />
                                       </div>
                                   </div>
@@ -922,19 +921,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                               <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 block">Link da Reunião</label>
                               <div className="relative">
                                   <Link2 size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" />
-                                  <input 
+                                  <input
                                     type="text"
                                     value={newEventLink}
                                     onChange={(e) => setNewEventLink(e.target.value)}
                                     className="w-full p-5 pl-14 bg-slate-50 dark:bg-[#151a2e] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-3xl focus:ring-1 focus:ring-indigo-500 outline-none text-sm font-medium"
-                                    placeholder="https://meet.google.com/..." 
+                                    placeholder="https://meet.google.com/..."
                                   />
                               </div>
                           </div>
 
                           <div>
                               <label className="text-[11px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-3 block">Descrição</label>
-                              <textarea 
+                              <textarea
                                  value={newEventDesc}
                                  onChange={(e) => setNewEventDesc(e.target.value)}
                                  className="w-full p-6 bg-slate-50 dark:bg-[#151a2e] border border-gray-200 dark:border-white/5 text-gray-900 dark:text-white rounded-[32px] text-sm resize-none h-32 focus:ring-1 focus:ring-indigo-500 outline-none leading-relaxed placeholder:text-gray-300 dark:placeholder:text-gray-800"
@@ -951,11 +950,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                               <h4 className="text-2xl font-black text-gray-900 dark:text-white mb-2 tracking-tight">Mencionar Time</h4>
                               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Quem participará?</p>
                           </div>
-                          
+
                           <div className="space-y-3">
                               {users.map(user => (
-                                  <div 
-                                      key={user.id} 
+                                  <div
+                                      key={user.id}
                                       onClick={() => toggleAttendee(user.id)}
                                       className={`flex items-center gap-4 p-4 rounded-3xl cursor-pointer transition-all border ${selectedAttendees.includes(user.id) ? `bg-white dark:bg-indigo-600/10 border-indigo-500 shadow-xl dark:shadow-indigo-500/10` : 'bg-transparent border-transparent hover:bg-gray-100 dark:hover:bg-white/5'}`}
                                   >
@@ -999,7 +998,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ events, users, onAdd
                           <div className={`${activeTheme.accentBg} ${activeTheme.text} px-4 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest`}>{selectedEvent.type}</div>
                           <button onClick={() => setSelectedEvent(null)} className="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"><X size={24}/></button>
                       </div>
-                      
+
                       <div>
                           <h3 className="text-3xl font-black text-gray-900 dark:text-white mb-2 leading-tight">{selectedEvent.title}</h3>
                           <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
