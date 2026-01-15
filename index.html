@@ -1,70 +1,109 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR" class="no-transition">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nexus Gestão de Marketing</title>
-    
-    <script>
-      // BLOQUEIO CRÍTICO DE TEMA: Executa antes de qualquer renderização
-      (function() {
-        try {
-          const settings = JSON.parse(localStorage.getItem('nexus_settings'));
-          const isDark = settings ? settings.darkMode : false;
-          if (isDark) {
-            document.documentElement.classList.add('dark');
-            document.documentElement.style.backgroundColor = '#0b0e11';
-          } else {
-            document.documentElement.classList.remove('dark');
-            document.documentElement.style.backgroundColor = '#f9fafb';
-          }
-        } catch (e) {}
-      })();
-    </script>
 
-    <style>
-      :root { --bg-light: #f9fafb; --bg-dark: #0b0e11; }
-      html.dark { background-color: var(--bg-dark); color-scheme: dark; }
-      html:not(.dark) { background-color: var(--bg-light); color-scheme: light; }
-      
-      .no-transition * { transition: none !important; }
-      
-      .hide-scrollbar::-webkit-scrollbar { display: none; }
-      .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      .dark ::-webkit-scrollbar-track { background: #0b0e11; }
-      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-      .dark ::-webkit-scrollbar-thumb { background: #2a303c; }
-      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-    </style>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexus Gestão de Marketing</title>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            fontFamily: { sans: ['Poppins', 'sans-serif'] },
-            colors: {
-              dark: {
-                bg: '#0b0e11',
-                card: '#151a21',
-                hover: '#1e232d',
-                border: '#2a303c',
-              }
+  <script>
+    // BLOQUEIO CRÍTICO DE TEMA: Executa antes de qualquer renderização
+    (function () {
+      try {
+        const settings = JSON.parse(localStorage.getItem('nexus_settings'));
+        const isDark = settings ? settings.darkMode : false;
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+          document.documentElement.style.backgroundColor = '#0b0e11';
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.documentElement.style.backgroundColor = '#f9fafb';
+        }
+      } catch (e) { }
+    })();
+  </script>
+
+  <style>
+    :root {
+      --bg-light: #f9fafb;
+      --bg-dark: #0b0e11;
+    }
+
+    html.dark {
+      background-color: var(--bg-dark);
+      color-scheme: dark;
+    }
+
+    html:not(.dark) {
+      background-color: var(--bg-light);
+      color-scheme: light;
+    }
+
+    .no-transition * {
+      transition: none !important;
+    }
+
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .dark ::-webkit-scrollbar-track {
+      background: #0b0e11;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    .dark ::-webkit-scrollbar-thumb {
+      background: #2a303c;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Poppins', 'sans-serif'] },
+          colors: {
+            dark: {
+              bg: '#0b0e11',
+              card: '#151a21',
+              hover: '#1e232d',
+              border: '#2a303c',
             }
           }
         }
       }
-    </script>
-    
-    <script type="importmap">
+    }
+  </script>
+
+  <script type="importmap">
     {
       "imports": {
         "react": "https://aistudiocdn.com/react@^19.2.0",
@@ -80,16 +119,17 @@
     </script>
   <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-gray-50 dark:bg-[#0b0e11] text-slate-900 dark:text-white antialiased">
-    <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
-    <script>
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          document.documentElement.classList.remove('no-transition');
-        }, 200);
-      });
-    </script>
-  <script type="module" src="/index.tsx"></script>
+
+<body class="bg-gray-50 dark:bg-[#0b0e11] text-slate-900 dark:text-white antialiased">
+  <div id="root"></div>
+  <script type="module" src="./index.tsx"></script>
+  <script>
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.documentElement.classList.remove('no-transition');
+      }, 200);
+    });
+  </script>
 </body>
+
 </html>
