@@ -160,39 +160,59 @@ export const App: React.FC = () => {
   useEffect(() => {
     fetchAllData();
 
-    const channel = supabase.channel('nexus-realtime-v4')
-      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
-        console.log('[REALTIME] Change received:', payload);
-        const table = payload.table;
+    const channel = supabase.channel('nexus-realtime-v4');
 
-        switch (table) {
-          case 'tasks': fetchTasks(); break;
-          case 'calendar_events': fetchEvents(); break;
-          case 'documents': fetchDocuments(); break;
-          case 'notifications':
-            fetchNotifications();
-            if (payload.eventType === 'INSERT' && payload.new.userId === currentUser?.id) {
-              // Notificação do navegador
-              if (Notification.permission === 'granted') {
-                new Notification(payload.new.title, {
-                  body: payload.new.message,
-                  icon: '/logo.png',
-                  badge: '/logo.png'
-                });
-              }
-            }
-            break;
-          case 'users_profiles': fetchUsers(); break;
-          case 'system_settings': fetchSettings(); break;
-          case 'workflow_stages': fetchWorkflow(); fetchTasks(); break;
-          default: fetchAllData();
+    channel
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        console.log('[REALTIME] Tasks updated');
+        fetchTasks();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calendar_events' }, () => {
+        fetchEvents();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+        fetchDocuments();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, (payload) => {
+        console.log('[REALTIME] Notification received');
+        fetchNotifications();
+        if (payload.eventType === 'INSERT' && payload.new.userId === currentUser?.id) {
+          if (Notification.permission === 'granted') {
+            new Notification(payload.new.title, {
+              body: payload.new.message,
+              icon: '/logo.png',
+              badge: '/logo.png'
+            });
+          }
         }
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users_profiles' }, () => {
+        fetchUsers();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, () => {
+        fetchSettings();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'workflow_stages' }, () => {
+        fetchWorkflow();
+        fetchTasks(); // Updates to workflow might affect task display
+      })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED') setConnectionStatus('connected');
-        if (status === 'CHANNEL_ERROR') setConnectionStatus('error');
-        if (status === 'TIMED_OUT') setConnectionStatus('error');
-        if (status === 'CLOSED') setConnectionStatus('connecting');
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Connected to Realtime channels');
+          setConnectionStatus('connected');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Realtime Channel Error');
+          setConnectionStatus('error');
+        }
+        if (status === 'TIMED_OUT') {
+          console.error('⚠️ Realtime Timeout');
+          setConnectionStatus('error');
+        }
+        if (status === 'CLOSED') {
+          console.log('🔌 Realtime Disconnected');
+          setConnectionStatus('connecting');
+        }
       });
 
     return () => { supabase.removeChannel(channel); };
@@ -607,19 +627,60 @@ export const App: React.FC = () => {
         }}
       />}
       {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { const updated = { ...s, id: 'global-config' }; await supabase.from('system_settings').upsert([updated]); setSettings(updated); }} onUpdateUsers={async (updatedUsers) => { setUsers(updatedUsers); await supabase.from('users_profiles').upsert(updatedUsers); }} onUpdateWorkflow={async (nw) => {
-        // Mapeia a ordem para a nova coluna display_order
+        // 1. Identify deleted stages
+        const oldWorkflow = workflow;
+        const newStageIds = new Set(nw.map(s => s.id));
+        const deletedStages = oldWorkflow.filter(s => !newStageIds.has(s.id));
+        const stagesToDelete = deletedStages.map(s => s.id);
+
+        // 2. Prepare new ordered workflow
         const orderedWorkflow = nw.map((stage, index) => ({
           ...stage,
           display_order: index
         }));
 
+        // 3. Optimistic Update
         setWorkflow(orderedWorkflow);
+
         try {
-          await supabase.from('workflow_stages').delete().neq('id', 'placeholder');
-          await supabase.from('workflow_stages').insert(orderedWorkflow);
-          console.log('✅ Workflow reordenado e salvo com display_order.');
+          // 4. Handle Deleted Stages: Migrate tasks to the first new stage
+          if (deletedStages.length > 0 && orderedWorkflow.length > 0) {
+            const fallbackStageId = orderedWorkflow[0].id;
+
+            console.log(`🔄 Migrating tasks from stages [${stagesToDelete.join(', ')}] to '${fallbackStageId}'...`);
+
+            // Update DB
+            const { error: updateError } = await supabase
+              .from('tasks')
+              .update({ stage: fallbackStageId })
+              .in('stage', stagesToDelete);
+
+            if (updateError) {
+              console.error("❌ Error migrating tasks:", updateError);
+            } else {
+              console.log("✅ Tasks migrated successfully.");
+            }
+
+            // Update Local State
+            setTasks(prev => prev.map(t =>
+              stagesToDelete.includes(t.stage) ? { ...t, stage: fallbackStageId } : t
+            ));
+
+            // 5. Delete specific stages ONLY AFTER migrating tasks
+            const { error: deleteError } = await supabase.from('workflow_stages').delete().in('id', stagesToDelete);
+            if (deleteError) console.error("❌ Error deleting stages:", deleteError);
+          }
+
+          // 6. UPSERT ordered workflow (Updates existing + Inserts new)
+          const { error: upsertError } = await supabase.from('workflow_stages').upsert(orderedWorkflow);
+
+          if (upsertError) {
+            console.error('❌ Error updating workflow:', upsertError);
+          } else {
+            console.log('✅ Workflow synced (upserted).');
+          }
         } catch (e) {
-          console.error('Error updating workflow:', e);
+          console.error('CRITICAL Error updating workflow:', e);
         }
       }} onResetApp={handleResetApp} />}
       {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { await supabase.from('documents').delete().eq('id', id); }} themeColor={settings.themeColor} />}
