@@ -49,6 +49,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [isDeliveryTypeOpen, setIsDeliveryTypeOpen] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
   const [activeTab, setActiveTab] = useState<'general' | 'comments' | 'collaboration'>('general');
+  const [newComment, setNewComment] = useState('');
+  const [showMentionDropdown, setShowMentionDropdown] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const deliveryDropdownRef = useRef<HTMLDivElement>(null);
@@ -378,14 +381,14 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       className="h-[95vh]"
       contentClassName="flex flex-col md:flex-row overflow-hidden"
     >
-      <div className="flex-1 p-0 flex flex-col bg-white dark:bg-[#0b0e11] overflow-hidden">
+      <div className="flex-1 flex flex-col bg-white dark:bg-[#0b0e11] overflow-hidden min-h-0">
         {/* Tabs Header */}
-        <div className="flex items-center gap-6 px-8 py-4 border-b border-slate-100 dark:border-[#2a303c]">
+        <div className="flex items-center gap-3 sm:gap-6 px-4 sm:px-8 py-3 sm:py-4 border-b border-slate-100 dark:border-[#2a303c] flex-shrink-0">
           {['general', 'comments', 'collaboration'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab as any)}
-              className={`relative py-2 text-sm font-black uppercase tracking-widest transition-all ${activeTab === tab
+              className={`relative py-2 text-xs sm:text-sm font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === tab
                 ? 'text-indigo-600 dark:text-indigo-400'
                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                 }`}
@@ -398,10 +401,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           ))}
         </div>
 
-        <div className="flex-1 p-8 overflow-y-auto custom-scrollbar space-y-8">
+        <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto custom-scrollbar space-y-6 sm:space-y-8 min-h-0">
           {activeTab === 'general' && (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                 <Input
                   label="Cliente"
                   value={editedTask.client}
@@ -563,7 +566,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     </div>
                     <div className="space-y-2">
                       {referenceFiles.length === 0 ? (
-                        <div className="p-10 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-[24px] flex flex-col items-center justify-center text-center bg-slate-50/30 dark:bg-white/5">
+                        <div className="p-6 sm:p-10 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-[20px] sm:rounded-[24px] flex flex-col items-center justify-center text-center bg-slate-50/30 dark:bg-white/5">
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sem referências</p>
                         </div>
                       ) : (
@@ -602,7 +605,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                       </div>
                       <div className="space-y-2">
                         {deliverableFiles.length === 0 ? (
-                          <div className="p-10 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-[24px] flex flex-col items-center justify-center text-center bg-slate-50/30 dark:bg-white/5">
+                          <div className="p-6 sm:p-10 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-[20px] sm:rounded-[24px] flex flex-col items-center justify-center text-center bg-slate-50/30 dark:bg-white/5">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Aguardando entrega</p>
                           </div>
                         ) : (
@@ -654,20 +657,193 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           )}
 
           {activeTab === 'comments' && (
-            <div className="h-full flex flex-col items-center justify-center p-10 opacity-50">
-              <p className="text-sm font-bold text-gray-500">Comentários (Em Breve)</p>
+            <div className="space-y-6 h-full flex flex-col">
+              {/* Comments List */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+                {(!editedTask.comments || editedTask.comments.length === 0) ? (
+                  <div className="flex flex-col items-center justify-center py-20 opacity-50">
+                    <p className="text-sm font-bold text-gray-500">Nenhum comentário ainda</p>
+                    <p className="text-xs text-gray-400 mt-2">Seja o primeiro a comentar!</p>
+                  </div>
+                ) : (
+                  editedTask.comments.map((comment) => {
+                    const author = users.find(u => u.id === comment.userId);
+                    return (
+                      <div key={comment.id} className="bg-slate-50 dark:bg-[#151a21] rounded-2xl p-4 border border-slate-200 dark:border-[#2a303c]">
+                        <div className="flex items-start gap-3">
+                          <img src={author?.avatar} className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11]" alt={author?.name} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-bold text-gray-900 dark:text-white">{author?.name}</span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(comment.timestamp).toLocaleString('pt-BR', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
+                              {comment.text}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Comment Input */}
+              <div className="border-t border-slate-200 dark:border-[#2a303c] pt-4 relative">
+                <div className="flex items-start gap-3">
+                  <img src={currentUser.avatar} className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11]" alt={currentUser.name} />
+                  <div className="flex-1 relative">
+                    <textarea
+                      value={newComment}
+                      onChange={(e) => {
+                        setNewComment(e.target.value);
+                        const lastAtIndex = e.target.value.lastIndexOf('@');
+                        if (lastAtIndex !== -1 && lastAtIndex === e.target.value.length - 1) {
+                          setShowMentionDropdown(true);
+                          setMentionSearch('');
+                        } else if (lastAtIndex !== -1) {
+                          const searchTerm = e.target.value.slice(lastAtIndex + 1);
+                          if (searchTerm.includes(' ')) {
+                            setShowMentionDropdown(false);
+                          } else {
+                            setMentionSearch(searchTerm);
+                            setShowMentionDropdown(true);
+                          }
+                        } else {
+                          setShowMentionDropdown(false);
+                        }
+                      }}
+                      placeholder="Adicione um comentário... Use @ para mencionar alguém"
+                      className="w-full p-4 rounded-2xl border border-slate-200 dark:border-[#2a303c] bg-white dark:bg-[#151a21] text-sm text-gray-900 dark:text-white resize-none focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      rows={3}
+                    />
+
+                    {/* Mention Dropdown */}
+                    {showMentionDropdown && (
+                      <div className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl shadow-2xl z-50 overflow-hidden">
+                        <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                          {users
+                            .filter(u => u.name.toLowerCase().includes(mentionSearch.toLowerCase()))
+                            .map(user => (
+                              <button
+                                key={user.id}
+                                onClick={() => {
+                                  const lastAtIndex = newComment.lastIndexOf('@');
+                                  const beforeMention = newComment.slice(0, lastAtIndex);
+                                  setNewComment(beforeMention + `@${user.name} `);
+                                  setShowMentionDropdown(false);
+                                }}
+                                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-left"
+                              >
+                                <img src={user.avatar} className="w-8 h-8 rounded-full" alt={user.name} />
+                                <div>
+                                  <p className="text-sm font-bold text-gray-900 dark:text-white">{user.name}</p>
+                                  <p className="text-xs text-gray-500">{user.role}</p>
+                                </div>
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (newComment.trim()) {
+                        const comment = {
+                          id: `comment-${Date.now()}`,
+                          userId: currentUser.id,
+                          text: newComment,
+                          timestamp: Date.now()
+                        };
+                        handleSaveField('comments', [...(editedTask.comments || []), comment]);
+                        onAddComment(editedTask.id, newComment);
+                        setNewComment('');
+                      }
+                    }}
+                    disabled={!newComment.trim()}
+                    className="p-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    <Send size={20} />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
           {activeTab === 'collaboration' && (
-            <div className="h-full flex flex-col items-center justify-center p-10 opacity-50">
-              <p className="text-sm font-bold text-gray-500">Colaboração (Em Breve)</p>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Colaboradores</h3>
+                <p className="text-sm text-gray-500 mb-6">Adicione membros da equipe para ajudar nesta tarefa</p>
+              </div>
+
+              {/* Current Collaborators */}
+              {editedTask.collaboratorIds && editedTask.collaboratorIds.length > 0 && (
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Colaborando Atualmente</label>
+                  <div className="grid grid-cols-1 gap-3">
+                    {editedTask.collaboratorIds.map(collabId => {
+                      const collaborator = users.find(u => u.id === collabId);
+                      if (!collaborator) return null;
+                      return (
+                        <div key={collabId} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-[#151a21] rounded-2xl border border-slate-200 dark:border-[#2a303c]">
+                          <img src={collaborator.avatar} className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11]" alt={collaborator.name} />
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">{collaborator.name}</p>
+                            <p className="text-xs text-gray-500">{collaborator.role}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              handleSaveField('collaboratorIds', (editedTask.collaboratorIds || []).filter(id => id !== collabId));
+                            }}
+                            className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-all"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Available Users */}
+              <div className="space-y-3">
+                <label className="text-xs font-black text-gray-500 uppercase tracking-widest">Adicionar Colaborador</label>
+                <div className="grid grid-cols-1 gap-3 max-h-96 overflow-y-auto custom-scrollbar">
+                  {users
+                    .filter(u => u.id !== editedTask.assigneeId && !(editedTask.collaboratorIds || []).includes(u.id))
+                    .map(user => (
+                      <button
+                        key={user.id}
+                        onClick={() => {
+                          handleSaveField('collaboratorIds', [...(editedTask.collaboratorIds || []), user.id]);
+                        }}
+                        className="flex items-center gap-3 p-3 bg-white dark:bg-[#151a21] rounded-2xl border border-slate-200 dark:border-[#2a303c] hover:border-indigo-500/50 transition-all text-left group"
+                      >
+                        <img src={user.avatar} className="w-10 h-10 rounded-full border-2 border-white dark:border-[#0b0e11]" alt={user.name} />
+                        <div className="flex-1">
+                          <p className="text-sm font-bold text-gray-900 dark:text-white">{user.name}</p>
+                          <p className="text-xs text-gray-500">{user.role}</p>
+                        </div>
+                        <Plus size={20} className="text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                      </button>
+                    ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      <div className="w-full md:w-80 p-8 bg-slate-50 dark:bg-[#0b0e11] border-l border-slate-100 dark:border-[#2a303c] space-y-8 overflow-y-auto custom-scrollbar">
+      <div className="w-full md:w-80 lg:w-96 p-4 sm:p-6 lg:p-8 bg-slate-50 dark:bg-[#0b0e11] border-l border-slate-100 dark:border-[#2a303c] space-y-6 sm:space-y-8 overflow-y-auto custom-scrollbar flex-shrink-0">
 
         {isUploading && (
           <div className="bg-white dark:bg-[#151a21] p-6 rounded-[28px] border border-indigo-500/30 shadow-lg flex flex-col items-center gap-3 animate-pulse">

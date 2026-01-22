@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { LayoutDashboard, Kanban, Calendar as CalendarIcon, CheckCircle, Settings, LogOut, Menu, Bell, FileBarChart, Moon, Sun, FileText, ShieldCheck, RefreshCw, Loader2 } from 'lucide-react';
-import { User, UserRole, SystemSettings, Notification } from '../types';
+import { User, UserRole, SystemSettings } from '../types';
+import type { Notification } from '../types';
 
 interface LayoutProps {
   currentUser: User;
@@ -65,6 +66,16 @@ export const Layout: React.FC<LayoutProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Request browser notification permission on mount
+  React.useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission().then((perm) => {
+        console.log('Notification permission:', perm);
+      });
+    }
+  }, []);
+
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.MEMBER] },

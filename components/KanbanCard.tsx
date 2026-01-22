@@ -52,13 +52,12 @@ const DueDateBadge: React.FC<DueDateBadgeProps> = ({ dueDate, onUpdate }) => {
         e.stopPropagation();
         setIsEditing(true);
       }}
-      className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer px-2 py-1 rounded transition-colors border border-transparent hover:bg-gray-100 dark:hover:bg-[#2a303c] ${
-        isOverdue
+      className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer px-2 py-1 rounded transition-colors border border-transparent hover:bg-gray-100 dark:hover:bg-[#2a303c] ${isOverdue
           ? 'text-red-500 dark:text-red-400 bg-red-500/10'
           : isUrgent
-          ? 'text-orange-500 dark:text-orange-400 bg-orange-500/10'
-          : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
-      }`}
+            ? 'text-orange-500 dark:text-orange-400 bg-orange-500/10'
+            : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+        }`}
       title="Clique para alterar a data"
     >
       {isOverdue ? <AlertTriangle size={13} /> : <Clock size={13} />}
@@ -160,14 +159,14 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       {/* Tags Section */}
       <div className="flex flex-wrap gap-1.5 mb-4 items-center">
         {task.tags?.map((tag, idx) => (
-          <span 
-            key={idx} 
+          <span
+            key={idx}
             className="group/tag inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-[#151a21] text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-[#2a303c] hover:border-slate-300 dark:hover:border-slate-600 transition-all"
           >
             <TagIcon size={10} className="opacity-70" />
             {tag}
             {!isLocked && (
-              <button 
+              <button
                 onClick={(e) => handleRemoveTag(e, tag)}
                 className="hover:text-red-500 transition-colors"
               >
@@ -179,9 +178,9 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         {!isLocked && (
           <div className="relative inline-block">
             {isAddingTag ? (
-              <form 
-                onSubmit={handleAddTag} 
-                onClick={(e) => e.stopPropagation()} 
+              <form
+                onSubmit={handleAddTag}
+                onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
                 className="flex items-center"
               >
@@ -192,7 +191,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onBlur={() => {
-                    if(!tagInput.trim()) setIsAddingTag(false);
+                    if (!tagInput.trim()) setIsAddingTag(false);
                     else handleAddTag();
                   }}
                   className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white dark:bg-[#0b0e11] border border-blue-500 outline-none text-slate-900 dark:text-white w-20"
@@ -218,13 +217,29 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       <div className="flex items-center justify-between pt-3 border-t border-gray-100 dark:border-[#2a303c]">
         <div className="flex items-center gap-3">
           {assignee && (
-            <img 
-              src={assignee.avatar} 
-              alt={assignee.name} 
-              className="w-6 h-6 rounded-full border border-gray-200 dark:border-[#2a303c]" 
-            />
+            <div className="flex -space-x-2">
+              <img
+                src={assignee.avatar}
+                alt={assignee.name}
+                title={`Responsável: ${assignee.name}`}
+                className="w-6 h-6 rounded-full border border-gray-200 dark:border-[#2a303c] z-10"
+              />
+              {task.collaboratorIds && task.collaboratorIds.map(collabId => {
+                const collaborator = users.find(u => u.id === collabId);
+                if (!collaborator) return null;
+                return (
+                  <img
+                    key={collabId}
+                    src={collaborator.avatar}
+                    alt={collaborator.name}
+                    title={`Colaborador: ${collaborator.name}`}
+                    className="w-6 h-6 rounded-full border border-gray-200 dark:border-[#2a303c]"
+                  />
+                );
+              })}
+            </div>
           )}
-          
+
           {task.attachments && task.attachments.length > 0 && (
             <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 text-xs">
               <Paperclip size={12} />
@@ -239,10 +254,10 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             </div>
           )}
         </div>
-        
-        <DueDateBadge 
-          dueDate={task.dueDate} 
-          onUpdate={(newDate) => onUpdateTask(task.id, { dueDate: newDate })} 
+
+        <DueDateBadge
+          dueDate={task.dueDate}
+          onUpdate={(newDate) => onUpdateTask(task.id, { dueDate: newDate })}
         />
       </div>
     </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Task, User, UserRole, WorkflowStage, SystemSettings, Notification as AppNotification,
@@ -22,10 +21,9 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { DocumentEditorModal } from './components/DocumentEditorModal';
 import { supabase } from './supabase';
 
-const APP_SCHEMA_VERSION = '4.0'; // Upgrade para garantir limpeza total
+const APP_SCHEMA_VERSION = '4.0';
 
 export const App: React.FC = () => {
-  /* isSyncing state removed */
   const [isLoading, setIsLoading] = useState(true);
 
   // 1. Limpeza de emergência e Bump de Versão
@@ -87,6 +85,18 @@ export const App: React.FC = () => {
 
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
 
+  // ✅ NOVO: Pedir permissão para notificações do navegador
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        console.log('🔔 Permissão de notificação:', permission);
+        if (permission === 'granted') {
+          console.log('✅ Notificações do navegador habilitadas!');
+        }
+      });
+    }
+  }, []);
+
   const fetchSettings = async () => {
     const { data } = await supabase.from('system_settings').select('*').eq('id', 'global-config').maybeSingle();
     if (data && Array.isArray(data.deliveryTypes) && data.deliveryTypes.length > 0) {
@@ -126,7 +136,6 @@ export const App: React.FC = () => {
   };
 
   const fetchAllData = useCallback(async () => {
-
     try {
       console.log(`[SYNC] Conectando ao Banco de Dados...`);
       await Promise.all([
@@ -156,7 +165,6 @@ export const App: React.FC = () => {
         console.log('[REALTIME] Change received:', payload);
         const table = payload.table;
 
-        // Granular updates based on table name
         switch (table) {
           case 'tasks': fetchTasks(); break;
           case 'calendar_events': fetchEvents(); break;
@@ -164,16 +172,20 @@ export const App: React.FC = () => {
           case 'notifications':
             fetchNotifications();
             if (payload.eventType === 'INSERT' && payload.new.userId === currentUser?.id) {
-              // Simple browser notification or alert if window is not focused
+              // Notificação do navegador
               if (Notification.permission === 'granted') {
-                new Notification(payload.new.title, { body: payload.new.message });
+                new Notification(payload.new.title, {
+                  body: payload.new.message,
+                  icon: '/logo.png',
+                  badge: '/logo.png'
+                });
               }
             }
             break;
           case 'users_profiles': fetchUsers(); break;
           case 'system_settings': fetchSettings(); break;
           case 'workflow_stages': fetchWorkflow(); break;
-          default: fetchAllData(); // Fallback
+          default: fetchAllData();
         }
       })
       .subscribe((status) => {
@@ -202,19 +214,255 @@ export const App: React.FC = () => {
     };
 
     cleanupArchivedTasks();
-    const interval = setInterval(cleanupArchivedTasks, 60 * 60 * 1000); // Check every hour
+    const interval = setInterval(cleanupArchivedTasks, 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, [tasks]);
 
+  // ✅ FUNÇÃO MELHORADA: Criar notificações
+  const createNotification = async (
+    userId: string,
+    title: string,
+    message: string,
+    type: 'success' | 'info' | 'warning' | 'error' = 'info',
+    resourceId?: string,
+    resourceType?: 'task' | 'document'
+  ) => {
+    const notification: AppNotification = {
+      id: `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      userId,
+      title,
+      message,
+      type,
+      read: false,
+      timestamp: Date.now(),
+      resourceId,
+      resourceType
+    };
+
+    // Atualiza localmente se for para o usuário atual
+    if (currentUser?.id === userId) {
+      setNotifications(prev => [notification, ...prev]);
+    }
+
+    // Salva no banco
+    try {
+      await supabase.from('notifications').insert([notification]);
+      console.log(`✅ Notificação criada para ${userId}:`, title);
+    } catch (error) {
+      console.error('❌ Erro ao criar notificação:', error);
+    }
+  };
+
+  // ✅ NOVA FUNÇÃO: Criar tarefa COM notificações
+  const handleTaskCreate = async (newTask: Task) => {
+    try {
+      console.log('📋 Criando nova tarefa:', newTask.title);
+
+      // 1. Salvar tarefa no banco
+      await supabase.from('tasks').upsert([newTask]);
+      setTasks(prev => [...prev, newTask]);
+
+      // 2. Notificar o ASSIGNEE (se não for o criador)
+      if (newTask.assigneeId && newTask.assigneeId !== currentUser?.id) {
+        await createNotification(
+          newTask.assigneeId,
+          '📋 Nova Tarefa Atribuída',
+          `${currentUser?.name} atribuiu você à tarefa "${newTask.title}"`,
+          'info',
+          newTask.id,
+          'task'
+        );
+        console.log(`✅ Assignee ${newTask.assigneeId} notificado`);
+      }
+
+      // 3. Notificar COLABORADORES
+      if (newTask.collaboratorIds && newTask.collaboratorIds.length > 0) {
+        for (const collabId of newTask.collaboratorIds) {
+          if (collabId !== currentUser?.id && collabId !== newTask.assigneeId) {
+            await createNotification(
+              collabId,
+              '👥 Adicionado como Colaborador',
+              `${currentUser?.name} adicionou você como colaborador em "${newTask.title}"`,
+              'info',
+              newTask.id,
+              'task'
+            );
+            console.log(`✅ Colaborador ${collabId} notificado`);
+          }
+        }
+      }
+
+      // 4. Detectar @MENÇÕES na descrição
+      if (newTask.description) {
+        const mentionRegex = /@(\w+(?:\s+\w+)*)/g;
+        const mentions = [...newTask.description.matchAll(mentionRegex)];
+
+        for (const match of mentions) {
+          const mentionedName = match[1];
+          const mentionedUser = users.find(u =>
+            u.name.toLowerCase() === mentionedName.toLowerCase()
+          );
+
+          if (mentionedUser && mentionedUser.id !== currentUser?.id) {
+            await createNotification(
+              mentionedUser.id,
+              '🔔 Você foi mencionado',
+              `${currentUser?.name} mencionou você na tarefa "${newTask.title}"`,
+              'info',
+              newTask.id,
+              'task'
+            );
+            console.log(`✅ Usuário mencionado ${mentionedUser.id} notificado`);
+          }
+        }
+      }
+
+      // 5. Notificar MANAGERS se a tarefa for de alta prioridade
+      if (newTask.priority === TaskPriority.HIGH || newTask.priority === TaskPriority.URGENT) {
+        const managers = users.filter(u =>
+          (u.role === UserRole.ADMIN || u.role === UserRole.MANAGER) &&
+          u.id !== currentUser?.id
+        );
+
+        for (const manager of managers) {
+          await createNotification(
+            manager.id,
+            '🚨 Tarefa Urgente Criada',
+            `${currentUser?.name} criou uma tarefa ${newTask.priority === TaskPriority.URGENT ? 'URGENTE' : 'de ALTA prioridade'}: "${newTask.title}"`,
+            'warning',
+            newTask.id,
+            'task'
+          );
+        }
+      }
+
+      setIsTaskModalOpen(false);
+      console.log('✅ Tarefa criada e notificações enviadas com sucesso!');
+
+    } catch (error) {
+      console.error('❌ Erro ao criar tarefa:', error);
+      alert('Erro ao criar tarefa. Verifique o console.');
+    }
+  };
+
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    const oldTask = tasks.find(t => t.id === taskId);
+
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {
         const updated = { ...t, ...updates };
         supabase.from('tasks').upsert([updated]);
+
+        // Notificar mudanças de STAGE
+        if (oldTask && updates.stage && updates.stage !== oldTask.stage) {
+          const assignee = users.find(u => u.id === updated.assigneeId);
+          const managers = users.filter(u => u.role === UserRole.ADMIN || u.role === UserRole.MANAGER);
+
+          // Notificar assignee
+          if (assignee && currentUser?.id !== assignee.id) {
+            createNotification(
+              assignee.id,
+              '📊 Status da Tarefa Atualizado',
+              `A tarefa "${updated.title}" mudou para: ${workflow.find(w => w.id === updates.stage)?.name || updates.stage}`,
+              'info',
+              taskId,
+              'task'
+            );
+          }
+
+          // Notificar managers se aprovado/rejeitado
+          if (updates.stage === 'approved' || updates.stage === 'changes') {
+            managers.forEach(manager => {
+              if (manager.id !== currentUser?.id) {
+                createNotification(
+                  manager.id,
+                  updates.stage === 'approved' ? '✅ Tarefa Aprovada' : '⚠️ Alterações Solicitadas',
+                  `${currentUser?.name} ${updates.stage === 'approved' ? 'aprovou' : 'solicitou alterações em'} "${updated.title}"`,
+                  updates.stage === 'approved' ? 'success' : 'warning',
+                  taskId,
+                  'task'
+                );
+              }
+            });
+          }
+        }
+
+        // Notificar mudança de ASSIGNEE
+        if (oldTask && updates.assigneeId && updates.assigneeId !== oldTask.assigneeId) {
+          if (updates.assigneeId !== currentUser?.id) {
+            createNotification(
+              updates.assigneeId,
+              '📋 Você foi atribuído a uma tarefa',
+              `${currentUser?.name} atribuiu você à tarefa "${updated.title}"`,
+              'info',
+              taskId,
+              'task'
+            );
+          }
+        }
+
+        // Notificar NOVOS colaboradores
+        if (oldTask && updates.collaboratorIds) {
+          const newCollaborators = updates.collaboratorIds.filter(id =>
+            !(oldTask.collaboratorIds || []).includes(id)
+          );
+          newCollaborators.forEach(collabId => {
+            if (collabId !== currentUser?.id) {
+              createNotification(
+                collabId,
+                '👥 Adicionado como Colaborador',
+                `Você foi adicionado como colaborador em "${updated.title}"`,
+                'info',
+                taskId,
+                'task'
+              );
+            }
+          });
+        }
+
         return updated;
       }
       return t;
     }));
+  };
+
+  const handleAddComment = async (taskId: string, commentText: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Detectar @menções no comentário
+    const mentionRegex = /@(\w+(?:\s+\w+)*)/g;
+    const mentions = [...commentText.matchAll(mentionRegex)];
+
+    mentions.forEach(match => {
+      const mentionedName = match[1];
+      const mentionedUser = users.find(u =>
+        u.name.toLowerCase() === mentionedName.toLowerCase()
+      );
+
+      if (mentionedUser && mentionedUser.id !== currentUser?.id) {
+        createNotification(
+          mentionedUser.id,
+          '💬 Você foi mencionado em um comentário',
+          `${currentUser?.name} mencionou você em "${task.title}"`,
+          'info',
+          taskId,
+          'task'
+        );
+      }
+    });
+
+    // Notificar assignee sobre novo comentário (se não for ele quem comentou)
+    if (task.assigneeId && task.assigneeId !== currentUser?.id) {
+      createNotification(
+        task.assigneeId,
+        '💬 Novo comentário na sua tarefa',
+        `${currentUser?.name} comentou em "${task.title}"`,
+        'info',
+        taskId,
+        'task'
+      );
+    }
   };
 
   const handleLogin = (user: User) => {
@@ -233,7 +481,6 @@ export const App: React.FC = () => {
     setIsLoading(true);
     try {
       localStorage.clear();
-      // Deletar com filtro que pegue todos (ex: neq id -1)
       await supabase.from('tasks').delete().neq('id', 'placeholder');
       await supabase.from('calendar_events').delete().neq('id', 'placeholder');
       await supabase.from('documents').delete().neq('id', 'placeholder');
@@ -256,8 +503,26 @@ export const App: React.FC = () => {
       connectionStatus={connectionStatus}
       onNewTask={() => {
         const firstDeliveryId = settings?.deliveryTypes?.[0]?.id || 'social-media';
-        const newTask: Task = { id: `t-${Date.now()}`, title: '', description: '', stage: workflow[0].id, priority: TaskPriority.MEDIUM, assigneeId: currentUser.id, dueDate: Date.now() + 86400000, client: 'Novo Cliente', projectType: firstDeliveryId, estimatedHours: 4, tags: [], subtasks: [], attachments: [], comments: [], timeSpent: 0, accepted: false };
-        setSelectedTask(newTask); setIsTaskModalOpen(true);
+        const newTask: Task = {
+          id: `t-${Date.now()}`,
+          title: '',
+          description: '',
+          stage: workflow[0].id,
+          priority: TaskPriority.MEDIUM,
+          assigneeId: currentUser.id,
+          dueDate: Date.now() + 86400000,
+          client: 'Novo Cliente',
+          projectType: firstDeliveryId,
+          estimatedHours: 4,
+          tags: [],
+          subtasks: [],
+          attachments: [],
+          comments: [],
+          timeSpent: 0,
+          accepted: false
+        };
+        setSelectedTask(newTask);
+        setIsTaskModalOpen(true);
       }}
       onOpenProfile={() => setIsProfileModalOpen(true)}
       settings={settings}
@@ -295,33 +560,41 @@ export const App: React.FC = () => {
           const newNotifs: AppNotification[] = event.attendeeIds.map(uid => ({
             id: `n-${Date.now()}-${uid}`,
             userId: uid,
-            title: 'Evento Iniciando',
+            title: '📅 Evento Iniciando',
             message: `O evento "${event.title}" está prestes a começar!`,
             type: 'info',
             read: false,
             timestamp: Date.now(),
             resourceId: event.id,
-            resourceType: 'task' // reusing task type or could add 'event' to types if stricter
+            resourceType: 'task'
           }));
           await supabase.from('notifications').insert(newNotifs);
-          alert('Participantes notificados com sucesso!');
+          alert('✅ Participantes notificados com sucesso!');
         }}
         themeColor={settings.themeColor}
         settings={settings}
       />}
       {currentView === 'reports' && <Reports tasks={tasks} users={users} events={events} workflow={workflow} themeColor={settings.themeColor} />}
-      {currentView === 'approvals' && <ApprovalCenter tasks={tasks} onApprove={async (tid, aid) => { const task = tasks.find(t => t.id === tid); if (task) { const updatedAttachments = task.attachments.map(a => a.id === aid ? { ...a, status: 'approved' } : a); handleTaskUpdate(tid, { attachments: updatedAttachments as any, stage: settings.workflowRules.onApprove }); } }}
+      {currentView === 'approvals' && <ApprovalCenter
+        tasks={tasks}
+        onApprove={async (tid, aid) => {
+          const task = tasks.find(t => t.id === tid);
+          if (task) {
+            const updatedAttachments = task.attachments.map(a => a.id === aid ? { ...a, status: 'approved' } : a);
+            handleTaskUpdate(tid, { attachments: updatedAttachments as any, stage: settings.workflowRules.onApprove });
+          }
+        }}
         onReject={async (tid, aid, feedback) => {
           const task = tasks.find(t => t.id === tid);
           if (task) {
             const updatedAttachments = task.attachments.map(a => a.id === aid ? { ...a, status: 'rejected', feedback } : a);
             await handleTaskUpdate(tid, { attachments: updatedAttachments as any, stage: settings.workflowRules.onReject });
 
-            // Notify Assignee
+            // Notificar Assignee
             const notification: AppNotification = {
               id: `n-${Date.now()}`,
               userId: task.assigneeId,
-              title: 'Correção Solicitada',
+              title: '⚠️ Correção Solicitada',
               message: `O entregável da tarefa "${task.title}" precisa de ajustes. Toque para ver o feedback.`,
               type: 'warning',
               read: false,
@@ -331,13 +604,72 @@ export const App: React.FC = () => {
             };
             await supabase.from('notifications').insert([notification]);
           }
-        }} />}
+        }}
+      />}
       {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { const updated = { ...s, id: 'global-config' }; await supabase.from('system_settings').upsert([updated]); setSettings(updated); }} onUpdateUsers={async (updatedUsers) => { setUsers(updatedUsers); await supabase.from('users_profiles').upsert(updatedUsers); }} onUpdateWorkflow={async (nw) => { setWorkflow(nw); await supabase.from('workflow_stages').upsert(nw); }} onResetApp={handleResetApp} />}
       {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { await supabase.from('documents').delete().eq('id', id); }} themeColor={settings.themeColor} />}
 
-      <TaskDetailModal currentUser={currentUser} isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} task={selectedTask} allTasks={tasks} workflow={workflow} onUpdate={handleTaskUpdate} onCreate={async (t) => { await supabase.from('tasks').upsert([t]); setIsTaskModalOpen(false); }} onAddComment={async (taskId, text) => { const task = tasks.find(t => t.id === taskId); if (task) { const newComment: Comment = { id: `c-${Date.now()}`, userId: currentUser.id, text, timestamp: Date.now() }; handleTaskUpdate(taskId, { comments: [...(task.comments || []), newComment] }); } }} onDelete={async (tid) => { await supabase.from('tasks').delete().eq('id', tid); setIsTaskModalOpen(false); }} onAccept={(tid) => handleTaskUpdate(tid, { accepted: true, stage: settings.workflowRules.onAccept })} settings={settings} users={users} />
-      <UserProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} currentUser={currentUser} onUpdateProfile={async (up) => { const updated = { ...currentUser, ...up }; setCurrentUser(updated); await supabase.from('users_profiles').upsert([updated]); }} />
-      <DocumentEditorModal isOpen={isDocEditorOpen} onClose={() => setIsDocEditorOpen(false)} document={selectedDoc} onSave={async (doc) => { const id = selectedDoc ? selectedDoc.id : Date.now().toString(); const payload = { id, authorId: currentUser.id, createdAt: selectedDoc ? selectedDoc.createdAt : Date.now(), updatedAt: Date.now(), ...doc }; await supabase.from('documents').upsert([payload]); }} themeColor={settings.themeColor} tasks={tasks} users={users} currentUser={currentUser} />
+      <TaskDetailModal
+        currentUser={currentUser}
+        isOpen={isTaskModalOpen}
+        onClose={() => setIsTaskModalOpen(false)}
+        task={selectedTask}
+        allTasks={tasks}
+        workflow={workflow}
+        onUpdate={handleTaskUpdate}
+        onCreate={handleTaskCreate}
+        onAddComment={async (taskId, text) => {
+          const task = tasks.find(t => t.id === taskId);
+          if (task) {
+            const newComment: Comment = {
+              id: `c-${Date.now()}`,
+              userId: currentUser.id,
+              text,
+              timestamp: Date.now()
+            };
+            handleTaskUpdate(taskId, { comments: [...(task.comments || []), newComment] });
+            handleAddComment(taskId, text);
+          }
+        }}
+        onDelete={async (tid) => {
+          await supabase.from('tasks').delete().eq('id', tid);
+          setTasks(prev => prev.filter(t => t.id !== tid));
+          setIsTaskModalOpen(false);
+        }}
+        onAccept={(tid) => handleTaskUpdate(tid, { accepted: true, stage: settings.workflowRules.onAccept })}
+        settings={settings}
+        users={users}
+      />
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        onUpdateProfile={async (up) => {
+          const updated = { ...currentUser, ...up };
+          setCurrentUser(updated);
+          await supabase.from('users_profiles').upsert([updated]);
+        }}
+      />
+      <DocumentEditorModal
+        isOpen={isDocEditorOpen}
+        onClose={() => setIsDocEditorOpen(false)}
+        document={selectedDoc}
+        onSave={async (doc) => {
+          const id = selectedDoc ? selectedDoc.id : Date.now().toString();
+          const payload = {
+            id,
+            authorId: currentUser.id,
+            createdAt: selectedDoc ? selectedDoc.createdAt : Date.now(),
+            updatedAt: Date.now(),
+            ...doc
+          };
+          await supabase.from('documents').upsert([payload]);
+        }}
+        themeColor={settings.themeColor}
+        tasks={tasks}
+        users={users}
+        currentUser={currentUser}
+      />
     </Layout>
   );
 };
