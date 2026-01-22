@@ -184,7 +184,7 @@ export const App: React.FC = () => {
             break;
           case 'users_profiles': fetchUsers(); break;
           case 'system_settings': fetchSettings(); break;
-          case 'workflow_stages': fetchWorkflow(); break;
+          case 'workflow_stages': fetchWorkflow(); fetchTasks(); break;
           default: fetchAllData();
         }
       })
@@ -606,7 +606,15 @@ export const App: React.FC = () => {
           }
         }}
       />}
-      {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { const updated = { ...s, id: 'global-config' }; await supabase.from('system_settings').upsert([updated]); setSettings(updated); }} onUpdateUsers={async (updatedUsers) => { setUsers(updatedUsers); await supabase.from('users_profiles').upsert(updatedUsers); }} onUpdateWorkflow={async (nw) => { setWorkflow(nw); await supabase.from('workflow_stages').upsert(nw); }} onResetApp={handleResetApp} />}
+      {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { const updated = { ...s, id: 'global-config' }; await supabase.from('system_settings').upsert([updated]); setSettings(updated); }} onUpdateUsers={async (updatedUsers) => { setUsers(updatedUsers); await supabase.from('users_profiles').upsert(updatedUsers); }} onUpdateWorkflow={async (nw) => {
+        setWorkflow(nw);
+        try {
+          await supabase.from('workflow_stages').delete().neq('id', 'placeholder');
+          await supabase.from('workflow_stages').insert(nw);
+        } catch (e) {
+          console.error('Error updating workflow:', e);
+        }
+      }} onResetApp={handleResetApp} />}
       {currentView === 'documents' && <DocumentsView documents={documents} users={users} onCreate={() => { setSelectedDoc(null); setIsDocEditorOpen(true); }} onEdit={(doc) => { setSelectedDoc(doc); setIsDocEditorOpen(true); }} onDelete={async (id) => { await supabase.from('documents').delete().eq('id', id); }} themeColor={settings.themeColor} />}
 
       <TaskDetailModal
