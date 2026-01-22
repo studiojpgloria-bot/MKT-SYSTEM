@@ -367,83 +367,93 @@ export const App: React.FC = () => {
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     const oldTask = tasks.find(t => t.id === taskId);
+    if (!oldTask) return;
 
-    setTasks(prev => prev.map(t => {
-      if (t.id === taskId) {
-        const updated = { ...t, ...updates };
-        supabase.from('tasks').upsert([updated]);
+    // 1. Optimistic Update (Immediate Feedback)
+    const optimisticTask = { ...oldTask, ...updates };
+    setTasks(prev => prev.map(t => t.id === taskId ? optimisticTask : t));
 
-        // Notificar mudanças de STAGE
-        if (oldTask && updates.stage && updates.stage !== oldTask.stage) {
-          const assignee = users.find(u => u.id === updated.assigneeId);
-          const managers = users.filter(u => u.role === UserRole.ADMIN || u.role === UserRole.MANAGER);
+    try {
+      // 2. Persist to DB
+      const { error } = await supabase.from('tasks').upsert([optimisticTask]);
+      if (error) {
+        throw error;
+      }
 
-          // Notificar assignee
-          if (assignee && currentUser?.id !== assignee.id) {
-            createNotification(
-              assignee.id,
-              '📊 Status da Tarefa Atualizado',
-              `A tarefa "${updated.title}" mudou para: ${workflow.find(w => w.id === updates.stage)?.name || updates.stage}`,
-              'info',
-              taskId,
-              'task'
-            );
-          }
+      // 3. Notifications Logic
+      // Notificar mudanças de STAGE
+      if (oldTask && updates.stage && updates.stage !== oldTask.stage) {
+        const assignee = users.find(u => u.id === optimisticTask.assigneeId);
+        const managers = users.filter(u => u.role === UserRole.ADMIN || u.role === UserRole.MANAGER);
 
-          // Notificar managers se aprovado/rejeitado
-          if (updates.stage === 'approved' || updates.stage === 'changes') {
-            managers.forEach(manager => {
-              if (manager.id !== currentUser?.id) {
-                createNotification(
-                  manager.id,
-                  updates.stage === 'approved' ? '✅ Tarefa Aprovada' : '⚠️ Alterações Solicitadas',
-                  `${currentUser?.name} ${updates.stage === 'approved' ? 'aprovou' : 'solicitou alterações em'} "${updated.title}"`,
-                  updates.stage === 'approved' ? 'success' : 'warning',
-                  taskId,
-                  'task'
-                );
-              }
-            });
-          }
-        }
-
-        // Notificar mudança de ASSIGNEE
-        if (oldTask && updates.assigneeId && updates.assigneeId !== oldTask.assigneeId) {
-          if (updates.assigneeId !== currentUser?.id) {
-            createNotification(
-              updates.assigneeId,
-              '📋 Você foi atribuído a uma tarefa',
-              `${currentUser?.name} atribuiu você à tarefa "${updated.title}"`,
-              'info',
-              taskId,
-              'task'
-            );
-          }
-        }
-
-        // Notificar NOVOS colaboradores
-        if (oldTask && updates.collaboratorIds) {
-          const newCollaborators = updates.collaboratorIds.filter(id =>
-            !(oldTask.collaboratorIds || []).includes(id)
+        // Notificar assignee
+        if (assignee && currentUser?.id !== assignee.id) {
+          createNotification(
+            assignee.id,
+            '📊 Status da Tarefa Atualizado',
+            `A tarefa "${optimisticTask.title}" mudou para: ${workflow.find(w => w.id === updates.stage)?.name || updates.stage}`,
+            'info',
+            taskId,
+            'task'
           );
-          newCollaborators.forEach(collabId => {
-            if (collabId !== currentUser?.id) {
+        }
+
+        // Notificar managers se aprovado/rejeitado
+        if (updates.stage === 'approved' || updates.stage === 'changes') {
+          managers.forEach(manager => {
+            if (manager.id !== currentUser?.id) {
               createNotification(
-                collabId,
-                '👥 Adicionado como Colaborador',
-                `Você foi adicionado como colaborador em "${updated.title}"`,
-                'info',
+                manager.id,
+                updates.stage === 'approved' ? '✅ Tarefa Aprovada' : '⚠️ Alterações Solicitadas',
+                `${currentUser?.name} ${updates.stage === 'approved' ? 'aprovou' : 'solicitou alterações em'} "${optimisticTask.title}"`,
+                updates.stage === 'approved' ? 'success' : 'warning',
                 taskId,
                 'task'
               );
             }
           });
         }
-
-        return updated;
       }
-      return t;
-    }));
+
+      // Notificar mudança de ASSIGNEE
+      if (oldTask && updates.assigneeId && updates.assigneeId !== oldTask.assigneeId) {
+        if (updates.assigneeId !== currentUser?.id) {
+          createNotification(
+            updates.assigneeId,
+            '📋 Você foi atribuído a uma tarefa',
+            `${currentUser?.name} atribuiu você à tarefa "${optimisticTask.title}"`,
+            'info',
+            taskId,
+            'task'
+          );
+        }
+      }
+
+      // Notificar NOVOS colaboradores
+      if (oldTask && updates.collaboratorIds) {
+        const newCollaborators = updates.collaboratorIds.filter(id =>
+          !(oldTask.collaboratorIds || []).includes(id)
+        );
+        newCollaborators.forEach(collabId => {
+          if (collabId !== currentUser?.id) {
+            createNotification(
+              collabId,
+              '👥 Adicionado como Colaborador',
+              `Você foi adicionado como colaborador em "${optimisticTask.title}"`,
+              'info',
+              taskId,
+              'task'
+            );
+          }
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Erro ao atualizar tarefa:', error);
+      alert('Falha ao salvar alterações. Verifique sua conexão.');
+      // Revert Optimistic Update
+      setTasks(prev => prev.map(t => t.id === taskId ? oldTask : t));
+    }
   };
 
   const handleAddComment = async (taskId: string, commentText: string) => {
