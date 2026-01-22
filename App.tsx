@@ -105,7 +105,7 @@ export const App: React.FC = () => {
   };
 
   const fetchWorkflow = async () => {
-    const { data } = await supabase.from('workflow_stages').select('*').order('id');
+    const { data } = await supabase.from('workflow_stages').select('*').order('display_order', { ascending: true });
     if (data && data.length > 0) setWorkflow(data);
   };
 
@@ -607,10 +607,17 @@ export const App: React.FC = () => {
         }}
       />}
       {currentView === 'settings' && <Settings settings={settings} users={users} workflow={workflow} tasks={tasks} currentUser={currentUser} onUpdateSettings={async (s) => { const updated = { ...s, id: 'global-config' }; await supabase.from('system_settings').upsert([updated]); setSettings(updated); }} onUpdateUsers={async (updatedUsers) => { setUsers(updatedUsers); await supabase.from('users_profiles').upsert(updatedUsers); }} onUpdateWorkflow={async (nw) => {
-        setWorkflow(nw);
+        // Mapeia a ordem para a nova coluna display_order
+        const orderedWorkflow = nw.map((stage, index) => ({
+          ...stage,
+          display_order: index
+        }));
+
+        setWorkflow(orderedWorkflow);
         try {
           await supabase.from('workflow_stages').delete().neq('id', 'placeholder');
-          await supabase.from('workflow_stages').insert(nw);
+          await supabase.from('workflow_stages').insert(orderedWorkflow);
+          console.log('✅ Workflow reordenado e salvo com display_order.');
         } catch (e) {
           console.error('Error updating workflow:', e);
         }
