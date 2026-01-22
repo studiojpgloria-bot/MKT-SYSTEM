@@ -186,6 +186,26 @@ export const App: React.FC = () => {
     return () => { supabase.removeChannel(channel); };
   }, [fetchAllData]);
 
+  // Auto-delete archived tasks older than 7 days
+  useEffect(() => {
+    const cleanupArchivedTasks = () => {
+      const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+      const tasksToDelete = tasks.filter(t => t.archived && t.archivedAt && t.archivedAt < oneWeekAgo);
+
+      if (tasksToDelete.length > 0) {
+        console.log(`🗑️ Auto-deleting ${tasksToDelete.length} archived tasks older than 7 days`);
+        tasksToDelete.forEach(t => {
+          supabase.from('tasks').delete().eq('id', t.id);
+        });
+        setTasks(prev => prev.filter(t => !tasksToDelete.some(dt => dt.id === t.id)));
+      }
+    };
+
+    cleanupArchivedTasks();
+    const interval = setInterval(cleanupArchivedTasks, 60 * 60 * 1000); // Check every hour
+    return () => clearInterval(interval);
+  }, [tasks]);
+
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     setTasks(prev => prev.map(t => {
       if (t.id === taskId) {

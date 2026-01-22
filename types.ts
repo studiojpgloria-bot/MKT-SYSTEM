@@ -128,6 +128,9 @@ export interface Task {
   timeSpent: number;
   accepted: boolean;
   finalLink?: string;
+  archived?: boolean;
+  archivedAt?: number;
+  collaboratorIds?: string[];
 }
 
 export interface CalendarEvent {

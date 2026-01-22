@@ -45,7 +45,10 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
   const [isTimeLow, setIsTimeLow] = useState<boolean>(false);
   const [uploadCategory, setUploadCategory] = useState<'deliverable' | 'reference'>('deliverable');
   const [isUploading, setIsUploading] = useState(false);
+
   const [isDeliveryTypeOpen, setIsDeliveryTypeOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+  const [activeTab, setActiveTab] = useState<'general' | 'comments' | 'collaboration'>('general');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const deliveryDropdownRef = useRef<HTMLDivElement>(null);
@@ -318,6 +321,34 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
   };
 
+  const handleArchiveTask = async () => {
+    if (!editedTask || isDraft) return;
+    if (confirm('Tem certeza que deseja concluir e arquivar esta tarefa? Ela será excluída permanentemente após 1 semana.')) {
+      try {
+        await onUpdate(editedTask.id, {
+          archived: true,
+          archivedAt: Date.now(),
+          stage: 'approved' // Opcional: mover para approved ao arquivar
+        });
+        onClose();
+      } catch (error: any) {
+        alert('Erro ao arquivar: ' + stringifyError(error));
+      }
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!editedTask || isDraft) return;
+    if (confirm('ATENÇÃO: Tem certeza que deseja excluir permanentemente esta tarefa? Esta ação não pode ser desfeita.')) {
+      try {
+        await onDelete(editedTask.id);
+        onClose();
+      } catch (error: any) {
+        alert('Erro ao excluir: ' + stringifyError(error));
+      }
+    }
+  };
+
   const modalHeader = (
     <div className="flex items-center gap-4">
       <div className="bg-indigo-600 dark:bg-indigo-500/20 text-white dark:text-indigo-400 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest">
@@ -347,255 +378,292 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
       className="h-[95vh]"
       contentClassName="flex flex-col md:flex-row overflow-hidden"
     >
-      <div className="flex-1 p-8 overflow-y-auto custom-scrollbar space-y-8 bg-white dark:bg-[#0b0e11]">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <Input
-            label="Cliente"
-            value={editedTask.client}
-            onChange={(e) => handleSaveField('client', e.target.value)}
-            className="font-bold text-indigo-600 dark:text-indigo-400"
-            placeholder="Nome do cliente"
-          />
-
-          <Input
-            label="Título"
-            value={editedTask.title}
-            onChange={(e) => handleSaveField('title', e.target.value)}
-            className="font-bold"
-            placeholder="O que será entregue?"
-          />
+      <div className="flex-1 p-0 flex flex-col bg-white dark:bg-[#0b0e11] overflow-hidden">
+        {/* Tabs Header */}
+        <div className="flex items-center gap-6 px-8 py-4 border-b border-slate-100 dark:border-[#2a303c]">
+          {['general', 'comments', 'collaboration'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab as any)}
+              className={`relative py-2 text-sm font-black uppercase tracking-widest transition-all ${activeTab === tab
+                ? 'text-indigo-600 dark:text-indigo-400'
+                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+            >
+              {tab === 'general' ? 'Geral' : tab === 'comments' ? 'Comentários' : 'Colaboração'}
+              {activeTab === tab && (
+                <div className="absolute bottom-0 left-0 w-full h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full" />
+              )}
+            </button>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 gap-6">
-          <div className="space-y-2" ref={deliveryDropdownRef}>
-            <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2 px-1">
-              <Briefcase size={14} /> Tipo de Entrega
-            </label>
+        <div className="flex-1 p-8 overflow-y-auto custom-scrollbar space-y-8">
+          {activeTab === 'general' && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <Input
+                  label="Cliente"
+                  value={editedTask.client}
+                  onChange={(e) => handleSaveField('client', e.target.value)}
+                  className="font-bold text-indigo-600 dark:text-indigo-400"
+                  placeholder="Nome do cliente"
+                />
 
-            <div className="relative">
-              <button
-                onClick={() => setIsDeliveryTypeOpen(!isDeliveryTypeOpen)}
-                className={`w-full p-4 flex items-center justify-between bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold transition-all focus:ring-2 focus:ring-indigo-500/20 ${isDeliveryTypeOpen ? 'border-indigo-500/50' : ''}`}
-              >
-                <span className="text-slate-700 dark:text-white">{selectedDeliveryType?.name || 'Selecione um tipo'}</span>
-                <ChevronDown size={18} className={`text-gray-400 transition-transform ${isDeliveryTypeOpen ? 'rotate-180' : ''}`} />
-              </button>
+                <Input
+                  label="Título"
+                  value={editedTask.title}
+                  onChange={(e) => handleSaveField('title', e.target.value)}
+                  className="font-bold"
+                  placeholder="O que será entregue?"
+                />
+              </div>
 
-              {isDeliveryTypeOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="max-h-60 overflow-y-auto custom-scrollbar py-2">
-                    {deliveryTypes.map(dt => (
-                      <button
-                        key={dt.id}
-                        onClick={() => {
-                          handleSaveField('projectType', dt.id);
-                          setIsDeliveryTypeOpen(false);
-                        }}
-                        className={`w-full px-5 py-3 text-left text-sm font-medium transition-all flex items-center justify-between group ${editedTask.projectType === dt.id
-                          ? 'bg-blue-500 text-white'
-                          : 'text-slate-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-indigo-600 dark:hover:text-white'
-                          }`}
-                      >
-                        <span>{dt.name}</span>
-                        {editedTask.projectType === dt.id && <CheckCircle size={14} className="text-white" />}
-                      </button>
-                    ))}
-                    {deliveryTypes.length === 0 && <div className="p-4 text-xs text-gray-400 text-center">Nenhum tipo configurado</div>}
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-2" ref={deliveryDropdownRef}>
+                  <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2 px-1">
+                    <Briefcase size={14} /> Tipo de Entrega
+                  </label>
+
+                  <div className="relative">
+                    <button
+                      onClick={() => setIsDeliveryTypeOpen(!isDeliveryTypeOpen)}
+                      className={`w-full p-4 flex items-center justify-between bg-slate-50 dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl text-sm font-bold transition-all focus:ring-2 focus:ring-indigo-500/20 ${isDeliveryTypeOpen ? 'border-indigo-500/50' : ''}`}
+                    >
+                      <span className="text-slate-700 dark:text-white">{selectedDeliveryType?.name || 'Selecione um tipo'}</span>
+                      <ChevronDown size={18} className={`text-gray-400 transition-transform ${isDeliveryTypeOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isDeliveryTypeOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="max-h-60 overflow-y-auto custom-scrollbar py-2">
+                          {deliveryTypes.map(dt => (
+                            <button
+                              key={dt.id}
+                              onClick={() => {
+                                handleSaveField('projectType', dt.id);
+                                setIsDeliveryTypeOpen(false);
+                              }}
+                              className={`w-full px-5 py-3 text-left text-sm font-medium transition-all flex items-center justify-between group ${editedTask.projectType === dt.id
+                                ? 'bg-blue-500 text-white'
+                                : 'text-slate-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-indigo-600 dark:hover:text-white'
+                                }`}
+                            >
+                              <span>{dt.name}</span>
+                              {editedTask.projectType === dt.id && <CheckCircle size={14} className="text-white" />}
+                            </button>
+                          ))}
+                          {deliveryTypes.length === 0 && <div className="p-4 text-xs text-gray-400 text-center">Nenhum tipo configurado</div>}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest block px-1">Descrição Detalhada / Briefing</label>
-          <textarea
-            value={editedTask.description}
-            onChange={(e) => handleSaveField('description', e.target.value)}
-            className="w-full p-6 rounded-[24px] border border-slate-200 dark:border-[#2a303c] bg-slate-50/50 dark:bg-[#151a21]/30 text-sm text-slate-700 dark:text-gray-300 resize-none h-40 focus:ring-2 focus:ring-indigo-500/20 outline-none leading-relaxed transition-all"
-            placeholder="Detalhe os requisitos técnicos e criativos desta tarefa..."
-          />
-        </div>
-
-        <div className="space-y-3">
-          <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2 px-1">
-            <Tag size={16} className="text-indigo-600 dark:text-indigo-400" /> Gestão de Tags
-          </label>
-          <div className="flex flex-wrap gap-2 p-4 bg-slate-50 dark:bg-[#151a21]/40 rounded-2xl border border-slate-200 dark:border-[#2a303c]">
-            {editedTask.tags.map((tag, idx) => (
-              <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-white dark:bg-[#0b0e11] text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-[#2a303c] rounded-full text-xs font-bold transition-all hover:bg-indigo-50 dark:hover:bg-indigo-500/10 group">
-                <Hash size={10} />
-                {tag}
-                <button onClick={() => handleRemoveTag(tag)} className="ml-1 text-slate-400 hover:text-red-500 transition-colors">
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-                placeholder="Nova tag..."
-                className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-white outline-none focus:ring-0 placeholder:text-gray-400"
-              />
-              <button onClick={handleAddTag} className="p-1 text-indigo-600 dark:text-indigo-400 hover:bg-white dark:hover:bg-white/5 rounded-full transition-all">
-                <Plus size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2 px-1">
-            <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" /> Checklist de Atividades
-          </label>
-          <div className="space-y-2">
-            {(editedTask.subtasks || []).map(st => (
-              <div key={st.id} className="flex items-center gap-3 bg-slate-50 dark:bg-[#151a21]/40 p-3 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-[#2a303c] transition-all group">
-                <button
-                  onClick={() => handleSaveField('subtasks', (editedTask.subtasks || []).map(s => s.id === st.id ? { ...s, completed: !s.completed } : s))}
-                  className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${st.completed ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-[#2a303c]'}`}
-                >
-                  {st.completed && <CheckCircle size={12} className="text-white" />}
-                </button>
-                <span className={`text-sm font-semibold flex-1 ${st.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-gray-300'}`}>
-                  {st.title}
-                </span>
-                <button
-                  onClick={() => handleSaveField('subtasks', (editedTask.subtasks || []).filter(s => s.id !== st.id))}
-                  className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <Trash2 size={16} />
-                </button>
               </div>
-            ))}
-            <div className="relative">
-              <input
-                type="text"
-                value={newSubtask}
-                onChange={(e) => setNewSubtask(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (newSubtask.trim() && (handleSaveField('subtasks', [...(editedTask.subtasks || []), { id: Date.now().toString(), title: newSubtask, completed: false }]), setNewSubtask('')))}
-                placeholder="Adicionar nova atividade ao checklist..."
-                className="w-full bg-transparent border-dashed border-2 border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-medium text-slate-500 focus:border-indigo-500 focus:text-slate-900 dark:focus:text-white transition-all outline-none"
-              />
-              <button
-                onClick={() => (newSubtask.trim() && (handleSaveField('subtasks', [...(editedTask.subtasks || []), { id: Date.now().toString(), title: newSubtask, completed: false }]), setNewSubtask('')))}
-                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-indigo-600 text-white rounded-xl shadow-lg flex items-center justify-center hover:bg-indigo-700 transition-all"
-              >
-                <Plus size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Referências */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                  <Paperclip size={16} className="text-amber-500" /> Arquivos de Referência
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest block px-1">Descrição Detalhada / Briefing</label>
+                <textarea
+                  value={editedTask.description}
+                  onChange={(e) => handleSaveField('description', e.target.value)}
+                  className="w-full p-6 rounded-[24px] border border-slate-200 dark:border-[#2a303c] bg-slate-50/50 dark:bg-[#151a21]/30 text-sm text-slate-700 dark:text-gray-300 resize-none h-40 focus:ring-2 focus:ring-indigo-500/20 outline-none leading-relaxed transition-all"
+                  placeholder="Detalhe os requisitos técnicos e criativos desta tarefa..."
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2 px-1">
+                  <Tag size={16} className="text-indigo-600 dark:text-indigo-400" /> Gestão de Tags
                 </label>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setUploadCategory('reference'); fileInputRef.current?.click(); }}
-                  className="w-8 h-8 flex items-center justify-center bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 rounded-lg transition-all"
-                  title="Adicionar Referência"
-                  disabled={isUploading}
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-              <div className="space-y-2">
-                {referenceFiles.length === 0 ? (
-                  <div className="p-10 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-[24px] flex flex-col items-center justify-center text-center bg-slate-50/30 dark:bg-white/5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sem referências</p>
+                <div className="flex flex-wrap gap-2 p-4 bg-slate-50 dark:bg-[#151a21]/40 rounded-2xl border border-slate-200 dark:border-[#2a303c]">
+                  {editedTask.tags.map((tag, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1 px-3 py-1 bg-white dark:bg-[#0b0e11] text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-[#2a303c] rounded-full text-xs font-bold transition-all hover:bg-indigo-50 dark:hover:bg-indigo-500/10 group">
+                      <Hash size={10} />
+                      {tag}
+                      <button onClick={() => handleRemoveTag(tag)} className="ml-1 text-slate-400 hover:text-red-500 transition-colors">
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                      placeholder="Nova tag..."
+                      className="bg-transparent border-none text-xs font-bold text-slate-700 dark:text-white outline-none focus:ring-0 placeholder:text-gray-400"
+                    />
+                    <button onClick={handleAddTag} className="p-1 text-indigo-600 dark:text-indigo-400 hover:bg-white dark:hover:bg-white/5 rounded-full transition-all">
+                      <Plus size={16} />
+                    </button>
                   </div>
-                ) : (
-                  referenceFiles.map(file => (
-                    <div key={file.id} className="flex items-center gap-3 p-3 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-xl group hover:border-amber-500/30 transition-all">
-                      <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-[#0b0e11] flex items-center justify-center text-amber-500 overflow-hidden shrink-0">
-                        {file.type === 'image' ? <img src={file.url} className="w-full h-full object-cover" /> : file.type === 'video' ? <Film size={18} /> : <FileText size={18} />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{file.name}</p>
-                        <p className="text-[9px] font-bold text-gray-500 uppercase">{file.type}</p>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <a href={file.url} target="_blank" rel="noreferrer" className="p-2 text-slate-400 hover:text-indigo-600"><Eye size={16} /></a>
-                        <button onClick={() => handleRemoveAttachment(file.id)} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
-                      </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2 px-1">
+                  <CheckSquare size={16} className="text-indigo-600 dark:text-indigo-400" /> Checklist de Atividades
+                </label>
+                <div className="space-y-2">
+                  {(editedTask.subtasks || []).map(st => (
+                    <div key={st.id} className="flex items-center gap-3 bg-slate-50 dark:bg-[#151a21]/40 p-3 rounded-2xl border border-transparent hover:border-slate-200 dark:hover:border-[#2a303c] transition-all group">
+                      <button
+                        onClick={() => handleSaveField('subtasks', (editedTask.subtasks || []).map(s => s.id === st.id ? { ...s, completed: !s.completed } : s))}
+                        className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${st.completed ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300 dark:border-[#2a303c]'}`}
+                      >
+                        {st.completed && <CheckCircle size={12} className="text-white" />}
+                      </button>
+                      <span className={`text-sm font-semibold flex-1 ${st.completed ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-gray-300'}`}>
+                        {st.title}
+                      </span>
+                      <button
+                        onClick={() => handleSaveField('subtasks', (editedTask.subtasks || []).filter(s => s.id !== st.id))}
+                        className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Entregáveis */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between px-1">
-                <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                  <Target size={16} className="text-indigo-600 dark:text-indigo-400" /> Arquivos para Revisão
-                </label>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setUploadCategory('deliverable'); fileInputRef.current?.click(); }}
-                  className="w-8 h-8 flex items-center justify-center bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600/20 rounded-lg transition-all"
-                  title="Enviar Entregável"
-                  disabled={isUploading}
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-              <div className="space-y-2">
-                {deliverableFiles.length === 0 ? (
-                  <div className="p-10 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-[24px] flex flex-col items-center justify-center text-center bg-slate-50/30 dark:bg-white/5">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Aguardando entrega</p>
+                  ))}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={newSubtask}
+                      onChange={(e) => setNewSubtask(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && (newSubtask.trim() && (handleSaveField('subtasks', [...(editedTask.subtasks || []), { id: Date.now().toString(), title: newSubtask, completed: false }]), setNewSubtask('')))}
+                      placeholder="Adicionar nova atividade ao checklist..."
+                      className="w-full bg-transparent border-dashed border-2 border-slate-200 dark:border-[#2a303c] rounded-2xl p-4 text-sm font-medium text-slate-500 focus:border-indigo-500 focus:text-slate-900 dark:focus:text-white transition-all outline-none"
+                    />
+                    <button
+                      onClick={() => (newSubtask.trim() && (handleSaveField('subtasks', [...(editedTask.subtasks || []), { id: Date.now().toString(), title: newSubtask, completed: false }]), setNewSubtask('')))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-indigo-600 text-white rounded-xl shadow-lg flex items-center justify-center hover:bg-indigo-700 transition-all"
+                    >
+                      <Plus size={20} />
+                    </button>
                   </div>
-                ) : (
-                  deliverableFiles.map(file => (
-                    <div key={file.id} className="flex flex-col gap-3 p-3 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-xl group hover:border-indigo-500/30 transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-[#0b0e11] flex items-center justify-center text-indigo-600 overflow-hidden shrink-0">
-                          {file.type === 'image' ? <img src={file.url} className="w-full h-full object-cover" /> : file.type === 'video' ? <Film size={18} /> : <FileText size={18} />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{file.name}</p>
-                          <div className="flex items-center gap-2">
-                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${file.status === 'approved' ? 'bg-green-500/10 text-green-500' : file.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-indigo-500/10 text-indigo-500'}`}>{file.status}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                          <a href={file.url} target="_blank" rel="noreferrer" className="p-2 text-slate-400 hover:text-indigo-600"><Eye size={16} /></a>
-                          <button onClick={() => handleRemoveAttachment(file.id)} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
-                        </div>
-                      </div>
+                </div>
+              </div>
 
-                      {file.status === 'rejected' && file.feedback && (
-                        <div className="bg-red-50 dark:bg-red-500/10 p-3 rounded-lg border border-red-100 dark:border-red-500/20">
-                          <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1.5 flex items-center gap-2">
-                            <Target size={12} /> Ajustes Solicitados
-                          </p>
-                          <p className="text-xs text-red-700 dark:text-red-300 whitespace-pre-wrap font-medium leading-relaxed">
-                            {file.feedback}
-                          </p>
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Referências */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between px-1">
+                      <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                        <Paperclip size={16} className="text-amber-500" /> Arquivos de Referência
+                      </label>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setUploadCategory('reference'); fileInputRef.current?.click(); }}
+                        className="w-8 h-8 flex items-center justify-center bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 rounded-lg transition-all"
+                        title="Adicionar Referência"
+                        disabled={isUploading}
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {referenceFiles.length === 0 ? (
+                        <div className="p-10 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-[24px] flex flex-col items-center justify-center text-center bg-slate-50/30 dark:bg-white/5">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sem referências</p>
                         </div>
+                      ) : (
+                        referenceFiles.map(file => (
+                          <div key={file.id} className="flex items-center gap-3 p-3 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-xl group hover:border-amber-500/30 transition-all">
+                            <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-[#0b0e11] flex items-center justify-center text-amber-500 overflow-hidden shrink-0">
+                              {file.type === 'image' ? <img src={file.url} className="w-full h-full object-cover" /> : file.type === 'video' ? <Film size={18} /> : <FileText size={18} />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{file.name}</p>
+                              <p className="text-[9px] font-bold text-gray-500 uppercase">{file.type}</p>
+                            </div>
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                              <button onClick={(e) => { e.stopPropagation(); setPreviewAttachment(file); }} className="p-2 text-slate-400 hover:text-indigo-600"><Eye size={16} /></button>
+                              <button onClick={() => handleRemoveAttachment(file.id)} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
+                            </div>
+                          </div>
+                        ))
                       )}
                     </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
 
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            onChange={handleFileUpload}
-            accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,application/pdf"
-          />
+                    {/* Entregáveis */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between px-1">
+                        <label className="text-[10px] font-black text-slate-500 dark:text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                          <Target size={16} className="text-indigo-600 dark:text-indigo-400" /> Arquivos para Revisão
+                        </label>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setUploadCategory('deliverable'); fileInputRef.current?.click(); }}
+                          className="w-8 h-8 flex items-center justify-center bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-600/20 rounded-lg transition-all"
+                          title="Enviar Entregável"
+                          disabled={isUploading}
+                        >
+                          <Plus size={16} />
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {deliverableFiles.length === 0 ? (
+                          <div className="p-10 border-2 border-dashed border-slate-200 dark:border-[#2a303c] rounded-[24px] flex flex-col items-center justify-center text-center bg-slate-50/30 dark:bg-white/5">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Aguardando entrega</p>
+                          </div>
+                        ) : (
+                          deliverableFiles.map(file => (
+                            <div key={file.id} className="flex flex-col gap-3 p-3 bg-white dark:bg-[#151a21] border border-slate-200 dark:border-[#2a303c] rounded-xl group hover:border-indigo-500/30 transition-all">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-[#0b0e11] flex items-center justify-center text-indigo-600 overflow-hidden shrink-0">
+                                  {file.type === 'image' ? <img src={file.url} className="w-full h-full object-cover" /> : file.type === 'video' ? <Film size={18} /> : <FileText size={18} />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-slate-900 dark:text-white truncate">{file.name}</p>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${file.status === 'approved' ? 'bg-green-500/10 text-green-500' : file.status === 'rejected' ? 'bg-red-500/10 text-red-500' : 'bg-indigo-500/10 text-indigo-500'}`}>{file.status}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                                  <button onClick={(e) => { e.stopPropagation(); setPreviewAttachment(file); }} className="p-2 text-slate-400 hover:text-indigo-600"><Eye size={16} /></button>
+                                  <button onClick={() => handleRemoveAttachment(file.id)} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
+                                </div>
+                              </div>
+
+                              {file.status === 'rejected' && file.feedback && (
+                                <div className="bg-red-50 dark:bg-red-500/10 p-3 rounded-lg border border-red-100 dark:border-red-500/20">
+                                  <p className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-1.5 flex items-center gap-2">
+                                    <Target size={12} /> Ajustes Solicitados
+                                  </p>
+                                  <p className="text-xs text-red-700 dark:text-red-300 whitespace-pre-wrap font-medium leading-relaxed">
+                                    {file.feedback}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={handleFileUpload}
+                    accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/quicktime,application/pdf"
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'comments' && (
+            <div className="h-full flex flex-col items-center justify-center p-10 opacity-50">
+              <p className="text-sm font-bold text-gray-500">Comentários (Em Breve)</p>
+            </div>
+          )}
+
+          {activeTab === 'collaboration' && (
+            <div className="h-full flex flex-col items-center justify-center p-10 opacity-50">
+              <p className="text-sm font-bold text-gray-500">Colaboração (Em Breve)</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -704,8 +772,64 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
           >
             CANCELAR
           </Button>
+          {!isDraft && (
+            <div className="flex gap-3 pt-4 border-t border-slate-200 dark:border-[#2a303c]">
+              <button
+                onClick={handleArchiveTask}
+                className="flex-1 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 rounded-2xl transition-all border border-transparent hover:border-emerald-200"
+              >
+                CONCLUIR TAREFA
+              </button>
+              <button
+                onClick={handleDeleteTask}
+                className="py-4 px-6 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-2xl transition-all"
+              >
+                EXCLUIR
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* PREVIEW MODAL */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="relative w-full max-w-6xl h-full max-h-[90vh] flex flex-col items-center justify-center">
+            <div className="absolute top-4 right-4 flex items-center gap-4 z-50">
+              <a
+                href={previewAttachment.url}
+                download={previewAttachment.name}
+                target="_blank"
+                rel="noreferrer"
+                className="p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all backdrop-blur-md"
+                title="Baixar Arquivo"
+              >
+                <Download size={20} />
+              </a>
+              <button
+                onClick={() => setPreviewAttachment(null)}
+                className="p-3 bg-white/10 hover:bg-red-500/80 text-white rounded-full transition-all backdrop-blur-md"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="w-full h-full flex items-center justify-center p-4">
+              {previewAttachment.type === 'image' ? (
+                <img src={previewAttachment.url} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Preview" />
+              ) : previewAttachment.type === 'video' ? (
+                <video src={previewAttachment.url} controls className="max-w-full max-h-full rounded-lg shadow-2xl" />
+              ) : (
+                <iframe src={previewAttachment.url} className="w-full h-full bg-white rounded-lg shadow-2xl" title="PDF Preview" />
+              )}
+            </div>
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-md px-6 py-3 rounded-full text-white font-bold text-sm">
+              {previewAttachment.name}
+            </div>
+          </div>
+        </div>
+      )}
+
     </Modal>
   );
 };
