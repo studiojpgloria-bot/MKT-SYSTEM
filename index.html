@@ -85,6 +85,27 @@
       background: #94a3b8;
     }
   </style>
+
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Poppins', 'sans-serif'] },
+          colors: {
+            dark: {
+              bg: '#0b0e11',
+              card: '#151a21',
+              hover: '#1e232d',
+              border: '#2a303c',
+            }
+          }
+        }
+      }
+    }
+  </script>
 </head>
 
 <body class="antialiased">
